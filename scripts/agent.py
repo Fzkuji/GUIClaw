@@ -212,16 +212,33 @@ def activate_app(app_name):
 
 
 def get_window_bounds(app_name):
-    """Get window position and size."""
+    """Get the MAIN window position and size (largest window, not status bar panels).
+
+    Some apps like CleanMyMac have multiple windows (status bar panel, sidebar, main window).
+    We want the largest one.
+    """
     try:
-        r = subprocess.run(
-            ["osascript", "-e",
-             f'tell application "System Events" to tell process "{app_name}" '
-             f'to return {{position, size}} of window 1'],
-            capture_output=True, text=True, timeout=5)
-        nums = [int(n.strip()) for n in r.stdout.split(",") if n.strip()]
-        if len(nums) == 4:
-            return tuple(nums)
+        r = subprocess.run(["osascript", "-l", "JavaScript", "-e", f'''
+var se = Application("System Events");
+var ws = se.processes["{app_name}"].windows();
+var best = null;
+var bestArea = 0;
+for (var i = 0; i < ws.length; i++) {{
+    try {{
+        var p = ws[i].position();
+        var s = ws[i].size();
+        var area = s[0] * s[1];
+        if (area > bestArea) {{
+            bestArea = area;
+            best = [p[0], p[1], s[0], s[1]];
+        }}
+    }} catch(e) {{}}
+}}
+if (best) best.join(","); else "";
+'''], capture_output=True, text=True, timeout=5)
+        parts = r.stdout.strip().split(",")
+        if len(parts) == 4:
+            return tuple(int(x) for x in parts)
     except:
         pass
     return None
@@ -257,20 +274,22 @@ def observe_state(app_name):
     bounds = get_window_bounds(app_name)
     state["window"] = bounds  # (x, y, w, h) or None
 
-    # 4. Screenshot and OCR to understand page state
+    # 4. Screenshot → resize to logical (982x1512) → OCR
+    #    Resized screenshot coords = screen logical coords directly.
+    #    Do NOT use retina fullscreen (3024x1964) — OCR will timeout.
     subprocess.run(["/usr/sbin/screencapture", "-x", "/tmp/_observe.png"],
                    capture_output=True, timeout=5)
     subprocess.run(["sips", "-z", "982", "1512", "/tmp/_observe.png",
                     "--out", "/tmp/_observe_s.png"],
                    capture_output=True, timeout=5)
 
-    # 5. OCR key elements to determine state
+    # 5. OCR — coords are screen logical pixels (matching cliclick)
     sys.path.insert(0, str(SCRIPT_DIR))
     try:
         from gui_agent import ocr_find
         all_text = ocr_find("", img_path="/tmp/_observe_s.png")
 
-        # Filter to target window area if bounds known
+        # Filter to target window area
         if bounds:
             wx, wy, ww, wh = bounds
             window_text = [t for t in all_text
@@ -281,71 +300,123 @@ def observe_state(app_name):
 
         state["visible_text"] = [t.get("text", "") for t in window_text[:30]]
         state["all_elements"] = window_text
-    except:
+    except Exception as e:
         state["visible_text"] = []
         state["all_elements"] = []
+        state["ocr_error"] = str(e)
 
     return state
 
 
-def verify_element_exists(app_name, element_text, state=None):
+def find_element_in_window(element_text, state, exact=False, position="any"):
+    """Find an element in the target window.
+
+    Args:
+        element_text: text to search for
+        state: from observe_state()
+        exact: if True, match exact text only (not substring).
+               "Scan" won't match "Deep Scan" or "Smart Scan".
+        position: "any", "bottom", "top", "left", "right"
+                  Filters by position within the window.
+
+    Returns: list of matching elements [{text, cx, cy}, ...]
+    """
+    bounds = state.get("window")
+    results = []
+
+    for el in state.get("all_elements", []):
+        text = el.get("text", "")
+        cx, cy = el.get("cx", 0), el.get("cy", 0)
+
+        # Text matching
+        if exact:
+            if text.strip() != element_text.strip():
+                continue
+        else:
+            if element_text.lower() not in text.lower():
+                continue
+
+        # Window bounds check
+        if bounds:
+            wx, wy, ww, wh = bounds
+            if not (wx <= cx <= wx + ww and wy <= cy <= wy + wh):
+                continue
+
+            # Position filter within window
+            rel_y = (cy - wy) / wh  # 0.0 = top, 1.0 = bottom
+            rel_x = (cx - wx) / ww
+            if position == "bottom" and rel_y < 0.7:
+                continue
+            elif position == "top" and rel_y > 0.3:
+                continue
+            elif position == "left" and rel_x > 0.4:
+                continue
+            elif position == "right" and rel_x < 0.6:
+                continue
+
+        results.append({"text": text, "cx": cx, "cy": cy})
+
+    return results
+
+
+def verify_element_exists(app_name, element_text, state=None, exact=False, position="any"):
     """PRE-CLICK VERIFY: Is this element actually on screen right now?
+
+    Args:
+        exact: True = exact text match only (prevents "Scan" matching "Deep Scan")
+        position: filter by position in window ("bottom" for buttons)
 
     Returns: (exists, x, y) or (False, 0, 0)
     """
     if state is None:
         state = observe_state(app_name)
 
-    bounds = state.get("window")
-    for el in state.get("all_elements", []):
-        if element_text.lower() in el.get("text", "").lower():
-            cx, cy = el.get("cx", 0), el.get("cy", 0)
-            # Verify inside target window
-            if bounds:
-                wx, wy, ww, wh = bounds
-                if not (wx <= cx <= wx + ww and wy <= cy <= wy + wh):
-                    continue  # Outside target window, skip
-            return True, cx, cy
-
+    matches = find_element_in_window(element_text, state, exact=exact, position=position)
+    if matches:
+        return True, matches[0]["cx"], matches[0]["cy"]
     return False, 0, 0
 
 
-def safe_click(app_name, element_text, state=None):
+def safe_click(app_name, element_text, state=None, exact=False, position="any"):
     """Click with full verification: observe → verify → click → confirm.
+
+    Args:
+        exact: True = exact text match (prevents "Scan" matching "Deep Scan")
+        position: "bottom" = only match elements in bottom 30% of window
 
     Returns: (success, message)
     """
-    # STEP 0: Observe
     if state is None:
         state = observe_state(app_name)
 
-    # PRE-CLICK: Verify element exists in target window
-    exists, cx, cy = verify_element_exists(app_name, element_text, state)
+    exists, cx, cy = verify_element_exists(app_name, element_text, state,
+                                            exact=exact, position=position)
     if not exists:
-        return False, f"Element '{element_text}' not found on screen"
+        return False, f"Element '{element_text}' not found (exact={exact}, pos={position})"
 
-    # Click
     subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{cx},{cy}"], check=True)
 
-    # POST-ACTION: Verify state changed
     time.sleep(0.5)
-    new_state = observe_state(app_name)
-
     return True, f"Clicked '{element_text}' at ({cx},{cy})"
 
 
-def poll_and_click(app_name, target_text, max_wait=30, interval=2):
-    """Event-driven: poll until target appears, then click it.
+def poll_and_click(app_name, target_text, max_wait=30, interval=2,
+                   exact=False, position="any"):
+    """Event-driven: poll until target appears, then click.
 
-    Verifies target is in the correct window before clicking.
+    Args:
+        exact: True = exact match only
+        position: "bottom" = button area
+
     Returns: (found_and_clicked, message)
     """
     for i in range(max_wait // interval):
         state = observe_state(app_name)
-        exists, cx, cy = verify_element_exists(app_name, target_text, state)
+        exists, cx, cy = verify_element_exists(app_name, target_text, state,
+                                                exact=exact, position=position)
         if exists:
             subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{cx},{cy}"], check=True)
-            return True, f"Found and clicked '{target_text}' at ({cx},{cy})"
+            return True, f"Clicked '{target_text}' at ({cx},{cy})"
         time.sleep(interval)
 
     return False, f"Timeout waiting for '{target_text}'"
