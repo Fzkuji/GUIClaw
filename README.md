@@ -1,147 +1,168 @@
 <div align="center">
-  <img src="assets/banner.png" alt="GUI Agent Skills" width="100%" />
+  <img src="assets/banner.png" alt="GUIClaw" width="100%" />
 
-  
+  <h1>🦞 GUIClaw</h1>
 
   <p>
-    <strong>Vision-based desktop automation skills for LLM agents on macOS.</strong>
+    <strong>See your screen. Learn every button. Click precisely.</strong>
     <br />
-    See, learn, and control any desktop application autonomously.
+    Vision-based desktop automation skills for <a href="https://github.com/openclaw/openclaw">OpenClaw</a> agents on macOS.
+  </p>
+
+  <p>
+    <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick_Start-blue?style=for-the-badge" /></a>
+    <a href="#-openclaw-integration"><img src="https://img.shields.io/badge/🦞_OpenClaw-red?style=for-the-badge" /></a>
+    <a href="https://discord.com/invite/clawd"><img src="https://img.shields.io/badge/Discord-7289da?style=for-the-badge&logo=discord&logoColor=white" /></a>
   </p>
 
   <p>
     <img src="https://img.shields.io/badge/Platform-macOS_Apple_Silicon-black?logo=apple" />
-    <img src="https://img.shields.io/badge/Skill_for-OpenClaw-red" />
+    <img src="https://img.shields.io/badge/Detection-GPA_GUI_Detector-green" />
+    <img src="https://img.shields.io/badge/OCR-Apple_Vision-blue" />
     <img src="https://img.shields.io/badge/License-MIT-yellow" />
   </p>
 </div>
 
-## What Is This?
+---
 
-GUI-Agent-Skills is an **agent skill** — a set of instructions and tools that teach AI assistants how to control your desktop. Instead of writing automation scripts, your AI:
+## 🔥 News
 
-1. **Sees** your screen (YOLO icon detection + Apple Vision OCR)
-2. **Learns** every button, icon, and UI element (saves them to memory)
-3. **Remembers** what it learned (template matching, 100% accuracy, 0.3s)
-4. **Acts** precisely (click, type, paste, verify)
+- **[03/17/2026]** v0.2.0 — Workflow-based revise, event-driven polling, mandatory operation protocol (observe→verify→act→confirm), per-app visual memory with auto-cleanup.
+- **[03/16/2026]** v0.1.0 — GPA-GUI-Detector integration, Apple Vision OCR, template matching, browser automation, per-site memory.
+- **[03/10/2026]** v0.0.1 — Initial release: WeChat/Discord/Telegram automation, app profiles, fuzzy app matching.
 
-## 🚀 Install as OpenClaw Skill
+## 💬 Try It
+
+Just talk to your OpenClaw agent:
+
+> **You**: "帮我在微信里给小明发消息，就说明天见"
+>
+> **Agent**: "✅ 已发送给小明：明天见"
+
+> **You**: "帮我看看周五北京到济南的高铁票"
+>
+> **Agent**: "G29 18:00→19:31 ¥211 / G31 18:04→19:36 ¥211"
+
+> **You**: "Scan my Mac for malware"
+>
+> **Agent**: "✅ Deep scan complete: No threats found"
+
+> **You**: "Check if my GPU training is still running"
+>
+> **Agent**: "All 8 GPUs at 92% utilization — experiment is running."
+
+## 🚀 Quick Start
 
 ```bash
-# Clone into your OpenClaw skills directory
-cd ~/.openclaw/workspace/skills
-git clone https://github.com/Fzkuji/GUI-Agent-Skills.git gui-agent
+# 1. Clone into your skills directory
+git clone https://github.com/Fzkuji/GUIClaw.git
+cd GUIClaw
 
-# Run setup (installs cliclick, Python env, detection model)
+# 2. Install everything (Python env, models, dependencies)
+bash scripts/setup.sh
+
+# 3. Done — your agent can now control any desktop app
+```
+
+## 🦞 OpenClaw Integration
+
+GUIClaw is an OpenClaw-compatible skill. Install it and your agent automatically gains desktop vision.
+
+**1️⃣ Clone into OpenClaw skills directory:**
+```bash
+cd ~/.openclaw/workspace/skills
+git clone https://github.com/Fzkuji/GUIClaw.git gui-agent
 bash gui-agent/scripts/setup.sh
 ```
 
-Then add to your OpenClaw config (`~/.openclaw/openclaw.json`):
+**2️⃣ Add to OpenClaw config** (`~/.openclaw/openclaw.json`):
 ```json
 {
   "skills": {
-    "load": {
-      "extraDirs": ["~/.openclaw/workspace/skills"]
-    },
-    "entries": {
-      "gui-agent": { "enabled": true }
-    }
+    "load": { "extraDirs": ["~/.openclaw/workspace/skills"] },
+    "entries": { "gui-agent": { "enabled": true } }
   }
 }
 ```
 
-**That's it.** Your OpenClaw agent will now read `SKILL.md` automatically when you ask it to operate any desktop app.
+**3️⃣ Talk to your agent.** It reads `SKILL.md` automatically and knows how to operate any app.
 
-
-
-## 💬 Try It
-
-Once installed, just talk to your AI naturally:
-
-> **You**: "帮我在微信里给小明发消息，就说明天见"
->
-> **AI**: "✅ 已发送给小明：明天见"
-
-> **You**: "帮我看看周五北京到济南的高铁票"
->
-> **AI**: "G29 18:00→19:31 ¥211 / G31 18:04→19:36 ¥211 — 推荐这两趟，最快1.5小时"
-
-> **You**: "Check if my training experiment is still running"
->
-> **AI**: "All GPUs at 92% utilization — experiment is still running."
-
-> **You**: "Open Discord settings"
->
-> **AI**: "✅ Opened Discord settings."
+> That's it. OpenClaw handles cloning, setup, and execution. You just ask.
 
 ## 🧠 How It Works
 
 ```
-User: "Send a message to John"
-            │
-            ▼
-    ┌───────────────┐
-    │   SKILL.md    │ Agent reads rules
-    └───────┬───────┘
-            ▼
-    ┌───────────────┐     ┌───────────────────────┐
-    │ App in memory?├──No─▶  ui_detector.py       │
-    └───┬───────────┘     │  ├ GPA-GUI-Detector   │
-        │ Yes             │  ├ Apple Vision OCR    │
-    ┌────────────┐        └───────────┬───────────┘
-    │ Template   │                    │
-    │ Match 0.3s │          Save to memory
-    └─────┬──────┘                    │
-          └──────────┬────────────────┘
-                     ▼
-            ┌────────────────┐
-            │ Verify target  │ OCR chat header
-            └───────┬────────┘
-                    ▼
-            ┌────────────────┐
-            │ Act: click/type│ cliclick + paste
-            └───────┬────────┘
-                    ▼
-            ┌────────────────┐
-            │ Verify result  │ Confirm sent
-            └────────────────┘
+User: "Clean my Mac"
+         │
+         ▼
+┌─────────────────┐
+│ 0. OBSERVE      │ Screenshot → OCR → What app? What page? What state?
+└────────┬────────┘
+         ▼
+┌─────────────────┐     ┌──────────────────────┐
+│ In memory?      ├─No─▶│ DETECT (YOLO + OCR)  │
+└───┬─────────────┘     │ Save to memory       │
+    │ Yes               └──────────┬───────────┘
+    ▼                              │
+┌────────────┐                     │
+│ Template   │◀────────────────────┘
+│ Match 0.3s │
+└─────┬──────┘
+      ▼
+┌─────────────────┐
+│ 1. VERIFY       │ Is this the right element? In the right window?
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ 2. ACT          │ Click / type / send
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ 3. CONFIRM      │ Did it work? Right state now?
+└─────────────────┘
 ```
 
 ### Learn Once, Match Forever
 
-**First interaction** — AI detects everything (~4 seconds):
+**First time** — YOLO detects everything (~4 seconds):
 ```
-🔍 YOLO: 43 icons    📝 OCR: 34 text elements    🔗 Merged → 24 fixed UI components
+🔍 YOLO: 43 icons    📝 OCR: 34 text elements    🔗 → 24 fixed UI components saved
 ```
 
-**Every interaction after** — instant recognition (~0.3 seconds):
+**Every time after** — instant template match (~0.3 seconds):
 ```
-✅ sidebar_contacts (85,214) conf=1.0
-✅ emoji_button (354,530) conf=1.0
 ✅ search_bar_icon (202,70) conf=1.0
+✅ emoji_button (354,530) conf=1.0
+✅ sidebar_contacts (85,214) conf=1.0
 ```
 
-### Detection Stack
+## 🔍 Detection Stack
 
-| Detector | Speed | What it finds | Why it matters |
-|----------|-------|---------------|----------------|
+| Detector | Speed | Finds | Why |
+|----------|-------|-------|-----|
 | **[GPA-GUI-Detector](https://huggingface.co/Salesforce/GPA-GUI-Detector)** | 0.3s | Icons, buttons | Finds gray-on-gray icons others miss |
-| **Apple Vision OCR** | 1.6s | Text (CN + EN) | Best Chinese OCR available |
-| **Template Match** | 0.3s | Anything seen before | 100% accuracy after first learn |
+| **Apple Vision OCR** | 1.6s | Text (CN + EN) | Best Chinese OCR, pixel-accurate |
+| **Template Match** | 0.3s | Known components | 100% accuracy after first learn |
 
-### App Visual Memory
+## 📁 App Visual Memory
 
-Each app gets its own memory directory:
+Each app gets its own visual memory. Different pages/workflows are learned separately.
+
 ```
 memory/apps/
 ├── wechat/
-│   ├── profile.json              # Named components with coordinates
+│   ├── profile.json              # 24 named components
 │   ├── icons/
 │   │   ├── sidebar_contacts.png
 │   │   ├── emoji_button.png
 │   │   └── search_bar_icon.png
 │   └── pages/
 │       └── main_annotated.jpg
+├── cleanmymac_x/
+│   ├── icons/
+│   └── pages/
+│       ├── smart_scan/
+│       └── malware_removal/      # Different workflow = different page
 ├── google_chrome/
 │   ├── icons/
 │   └── sites/                    # Per-website memory
@@ -149,59 +170,56 @@ memory/apps/
 │       └── github_com/
 ```
 
-## ⚠️ Safety
+## ⚠️ Safety & Protocol
 
-Real bugs taught us these rules (they're enforced in code):
+Every action follows a mandatory protocol — **written into the code, not just documentation**:
 
-- **Always verify chat recipient** before sending messages (OCR the header)
-- **Window-bounded operations** — never click outside target app window
-- **No tiny templates** — templates < 30×30 pixels produce false matches
-- **Auto-learn validation** — only save from correct app context
+| Step | What | Why |
+|------|------|-----|
+| **OBSERVE** | Screenshot + OCR before any action | Know what state you're in |
+| **VERIFY** | Element exists? Correct window? Exact text match? | Prevent clicking wrong thing |
+| **ACT** | Click / type / send | Execute |
+| **CONFIRM** | Screenshot again, check state changed | Verify it worked |
+
+**Safety rules enforced in code:**
+- ✅ Verify chat recipient before sending messages (OCR header)
+- ✅ Window-bounded operations (no clicking outside target app)
+- ✅ Exact text matching (prevents "Scan" matching "Deep Scan")
+- ✅ Largest-window detection (skips status bar panels)
 
 ## 🗂️ Project Structure
 
 ```
-GUI-Agent-Skills/
-├── SKILL.md              # 📖 Agent reads this first (complete instruction manual)
+GUIClaw/
+├── SKILL.md                 # 🧠 Agent reads this first
 ├── scripts/
-│   ├── setup.sh          # One-command setup
-│   ├── ui_detector.py    # Detection engine (YOLO + OCR + AX)
-│   ├── app_memory.py     # Visual memory (learn/detect/click/verify)
-│   ├── gui_agent.py      # Task executor (send_message, etc.)
-│   └── template_match.py # Template matching utilities
-├── memory/               # Per-app visual memory (gitignored, machine-specific)
-├── actions/              # Atomic operations catalog
-├── scenes/               # Per-app operation workflows (YAML)
-├── apps/                 # App UI configs (JSON)
-├── docs/core.md          # Hard-won lessons & principles
+│   ├── setup.sh             # 🔧 One-command setup
+│   ├── agent.py             # 🎯 Unified entry point (observe→verify→act→confirm)
+│   ├── ui_detector.py       # 🔍 Detection engine (YOLO + OCR)
+│   ├── app_memory.py        # 🧠 Visual memory (learn/detect/click/verify)
+│   ├── gui_agent.py         # 🖱️ Task executor
+│   └── template_match.py    # 🎯 Template matching
+├── actions/_actions.yaml    # 📋 Atomic operations
+├── scenes/                  # 📝 Per-app workflows
+├── apps/                    # 📱 App UI configs
+├── docs/core.md             # 📚 Lessons learned
+├── memory/                  # 🔒 Visual memory (gitignored)
 └── requirements.txt
 ```
-
-### The `SKILL.md` Contract
-
-`SKILL.md` is the **single source of truth** for any AI agent using GUI-Agent-Skills. It contains:
-- Complete architecture and detection flow
-- Safety rules (critical, read-first section)
-- Step-by-step operation flows (sending messages, learning apps, clicking)
-- macOS coordinate system, input methods, AX API coverage
-- App-specific quirks and lessons learned
-
-Any OpenClaw agent, Claude Code instance, or LLM that reads `SKILL.md` can fully operate the system.
 
 ## 📦 Requirements
 
 - **macOS** with Apple Silicon (M1/M2/M3/M4)
 - **Accessibility permissions**: System Settings → Privacy → Accessibility
-- Everything else installed by `setup.sh`:
-  - Python 3.12, cliclick, PyTorch, ultralytics
-  - GPA-GUI-Detector model (40MB)
+- Everything else installed by `bash scripts/setup.sh`
 
 ## 🤝 Ecosystem
 
-| Tool | Role |
-|------|------|
-| [OpenClaw](https://github.com/openclaw/openclaw) | AI assistant framework — loads GUI-Agent-Skills as a skill |
-| [GPA-GUI-Detector](https://huggingface.co/Salesforce/GPA-GUI-Detector) | Salesforce's YOLO model for UI element detection |
+| | |
+|---|---|
+| 🦞 **[OpenClaw](https://github.com/openclaw/openclaw)** | AI assistant framework — loads GUIClaw as a skill |
+| 🔍 **[GPA-GUI-Detector](https://huggingface.co/Salesforce/GPA-GUI-Detector)** | Salesforce YOLO model for UI detection |
+| 💬 **[Discord Community](https://discord.com/invite/clawd)** | Get help, share feedback |
 
 ## 📄 License
 
