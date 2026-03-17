@@ -91,29 +91,32 @@
 [10s] 👁 CONFIRM — Process list empty → GlobalProtect terminated ✅
 ```
 
-## 🦞 Quick Start
+## 🚀 Quick Start
 
 ```bash
-# 1. Clone into OpenClaw skills directory
-cd ~/.openclaw/workspace/skills
-git clone https://github.com/Fzkuji/GUIClaw.git gui-agent
+# 1. Clone & install
+git clone https://github.com/Fzkuji/GUIClaw.git
+cd GUIClaw
+bash scripts/setup.sh
 
-# 2. Install everything (Python env, models, dependencies)
-bash gui-agent/scripts/setup.sh
+# 2. Grant accessibility permissions
+# System Settings → Privacy & Security → Accessibility → Add Terminal / OpenClaw
 
-# 3. Add to OpenClaw config (~/.openclaw/openclaw.json)
+# 3. Run
+source ~/gui-agent-env/bin/activate
+python3 scripts/agent.py learn --app WeChat          # Learn any app
+python3 scripts/agent.py click --app WeChat --component search_bar_icon  # Click by name
+python3 scripts/agent.py explore --app WeChat         # Vision analysis
 ```
 
-```json
-{
-  "skills": {
-    "load": { "extraDirs": ["~/.openclaw/workspace/skills"] },
-    "entries": { "gui-agent": { "enabled": true } }
-  }
-}
-```
+## 🦞 Use with OpenClaw (Recommended)
 
-**Done.** Your agent reads `SKILL.md` automatically and can now control any desktop app. Just talk to it.
+If you already use [OpenClaw](https://github.com/openclaw/openclaw) as your AI assistant:
+
+1️⃣ Clone into skills directory: `cd ~/.openclaw/workspace/skills && git clone https://github.com/Fzkuji/GUIClaw.git gui-agent && bash gui-agent/scripts/setup.sh`
+2️⃣ Enable in config: `"skills": { "entries": { "gui-agent": { "enabled": true } } }`
+3️⃣ Say: "帮我在微信里给小明发消息"
+4️⃣ Done — OpenClaw reads `SKILL.md`, learns the app, and operates it automatically. You just chat.
 
 ## 🧠 How It Works
 
