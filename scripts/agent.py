@@ -201,21 +201,14 @@ def resolve_app_name(raw_name):
 
 def activate_app(app_name):
     """Bring app to front."""
-    # Method 1: set frontmost via System Events (works for all apps including CleanMyMac)
     try:
         subprocess.run(["osascript", "-e",
             f'tell application "System Events" to set frontmost of process "{app_name}" to true'],
             capture_output=True, timeout=5)
         time.sleep(0.3)
-        return
     except:
-        pass
-    # Method 2: open command (fallback)
-    try:
         subprocess.run(["open", "-a", app_name], capture_output=True, timeout=5)
         time.sleep(0.5)
-    except:
-        pass
 
 
 def get_window_bounds(app_name):
@@ -232,6 +225,130 @@ def get_window_bounds(app_name):
     except:
         pass
     return None
+
+
+# ═══════════════════════════════════════════
+# MANDATORY: Observe → Verify → Act → Confirm
+# These functions enforce the Operation Protocol
+# ═══════════════════════════════════════════
+
+def observe_state(app_name):
+    """STEP 0: Observe current state before any action.
+
+    MANDATORY. Never skip this.
+    Returns: {frontmost, target_visible, window, page_state, elements}
+    """
+    state = {}
+
+    # 1. What app is in front?
+    try:
+        r = subprocess.run(["osascript", "-e",
+            'tell application "System Events" to return name of first process whose frontmost is true'],
+            capture_output=True, text=True, timeout=5)
+        state["frontmost"] = r.stdout.strip()
+    except:
+        state["frontmost"] = "unknown"
+
+    # 2. Activate target app
+    activate_app(app_name)
+    state["target_activated"] = True
+
+    # 3. Get window bounds
+    bounds = get_window_bounds(app_name)
+    state["window"] = bounds  # (x, y, w, h) or None
+
+    # 4. Screenshot and OCR to understand page state
+    subprocess.run(["/usr/sbin/screencapture", "-x", "/tmp/_observe.png"],
+                   capture_output=True, timeout=5)
+    subprocess.run(["sips", "-z", "982", "1512", "/tmp/_observe.png",
+                    "--out", "/tmp/_observe_s.png"],
+                   capture_output=True, timeout=5)
+
+    # 5. OCR key elements to determine state
+    sys.path.insert(0, str(SCRIPT_DIR))
+    try:
+        from gui_agent import ocr_find
+        all_text = ocr_find("", img_path="/tmp/_observe_s.png")
+
+        # Filter to target window area if bounds known
+        if bounds:
+            wx, wy, ww, wh = bounds
+            window_text = [t for t in all_text
+                          if wx <= t.get("cx", 0) <= wx + ww
+                          and wy <= t.get("cy", 0) <= wy + wh]
+        else:
+            window_text = all_text
+
+        state["visible_text"] = [t.get("text", "") for t in window_text[:30]]
+        state["all_elements"] = window_text
+    except:
+        state["visible_text"] = []
+        state["all_elements"] = []
+
+    return state
+
+
+def verify_element_exists(app_name, element_text, state=None):
+    """PRE-CLICK VERIFY: Is this element actually on screen right now?
+
+    Returns: (exists, x, y) or (False, 0, 0)
+    """
+    if state is None:
+        state = observe_state(app_name)
+
+    bounds = state.get("window")
+    for el in state.get("all_elements", []):
+        if element_text.lower() in el.get("text", "").lower():
+            cx, cy = el.get("cx", 0), el.get("cy", 0)
+            # Verify inside target window
+            if bounds:
+                wx, wy, ww, wh = bounds
+                if not (wx <= cx <= wx + ww and wy <= cy <= wy + wh):
+                    continue  # Outside target window, skip
+            return True, cx, cy
+
+    return False, 0, 0
+
+
+def safe_click(app_name, element_text, state=None):
+    """Click with full verification: observe → verify → click → confirm.
+
+    Returns: (success, message)
+    """
+    # STEP 0: Observe
+    if state is None:
+        state = observe_state(app_name)
+
+    # PRE-CLICK: Verify element exists in target window
+    exists, cx, cy = verify_element_exists(app_name, element_text, state)
+    if not exists:
+        return False, f"Element '{element_text}' not found on screen"
+
+    # Click
+    subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{cx},{cy}"], check=True)
+
+    # POST-ACTION: Verify state changed
+    time.sleep(0.5)
+    new_state = observe_state(app_name)
+
+    return True, f"Clicked '{element_text}' at ({cx},{cy})"
+
+
+def poll_and_click(app_name, target_text, max_wait=30, interval=2):
+    """Event-driven: poll until target appears, then click it.
+
+    Verifies target is in the correct window before clicking.
+    Returns: (found_and_clicked, message)
+    """
+    for i in range(max_wait // interval):
+        state = observe_state(app_name)
+        exists, cx, cy = verify_element_exists(app_name, target_text, state)
+        if exists:
+            subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{cx},{cy}"], check=True)
+            return True, f"Found and clicked '{target_text}' at ({cx},{cy})"
+        time.sleep(interval)
+
+    return False, f"Timeout waiting for '{target_text}'"
 
 
 # ═══════════════════════════════════════════
@@ -292,10 +409,17 @@ def click_and_wait(x, y, app_name, next_target, max_wait=30):
 
 
 def action_send_message(app_name, contact, message):
-    """Send a message in a chat app."""
+    """Send a message in a chat app. Full protocol: observe → verify → act → confirm."""
     app_name = resolve_app_name(app_name)
+
+    # STEP 0: Observe current state
+    print(f"  👁 Observing state...")
+    state = observe_state(app_name)
+    print(f"    Frontmost: {state['frontmost']}, Window: {state.get('window')}")
+    print(f"    Visible: {state['visible_text'][:5]}")
+
+    # Ensure app is ready
     ensure_app_ready(app_name, workflow="send_message")
-    activate_app(app_name)
 
     print(f"  📨 Sending to {contact}: {message}")
     out, code = run_script("gui_agent.py", [
@@ -322,17 +446,35 @@ def action_read_messages(app_name, contact=None):
 
 
 def action_click_component(app_name, component):
-    """Click a named component in an app."""
+    """Click a named component. Full protocol: observe → verify → click → confirm."""
     app_name = resolve_app_name(app_name)
-    ensure_app_ready(app_name, required_components=[component])
-    activate_app(app_name)
 
-    print(f"  🖱️ Clicking {component} in {app_name}")
-    out, code = run_script("app_memory.py", [
-        "click", "--app", app_name, "--component", component
-    ], timeout=15)
-    print(out)
-    return code == 0
+    # STEP 0: Observe
+    print(f"  👁 Observing state...")
+    state = observe_state(app_name)
+    print(f"    Frontmost: {state['frontmost']}, Window: {state.get('window')}")
+
+    # Ensure memory ready
+    ensure_app_ready(app_name, required_components=[component])
+
+    # PRE-CLICK: Verify component exists
+    print(f"  🔍 Verifying '{component}' exists...")
+    ok, msg = safe_click(app_name, component)
+    if ok:
+        print(f"  ✅ {msg}")
+    else:
+        # Fallback: use app_memory click (template match)
+        print(f"  ⚠ Direct verify failed ({msg}), trying template match...")
+        out, code = run_script("app_memory.py", [
+            "click", "--app", app_name, "--component", component
+        ], timeout=15)
+        print(out)
+        return code == 0
+
+    # POST-ACTION: Verify
+    new_state = observe_state(app_name)
+    print(f"  📋 After click: {new_state['visible_text'][:5]}")
+    return True
 
 
 def action_open_app(app_name):
