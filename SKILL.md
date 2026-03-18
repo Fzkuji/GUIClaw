@@ -116,9 +116,29 @@ memory/apps/<appname>/
 
 ### What Gets Saved
 
-1. **components/** - Each YOLO-detected component cropped and saved
+1. **components/** - Filtered YOLO-detected components (see filtering rules below)
 2. **profile.json** - App metadata
 3. **summary.json** - App overview with workflows
+
+### Component Filtering Rules
+
+Only save **stable UI elements** that will look the same next session:
+
+**SAVE** (stable):
+- Sidebar elements (left ~15% of window)
+- Toolbar elements (top ~12% of window)
+- Footer elements (bottom ~12% of window)
+- Any element with OCR text label
+
+**SKIP** (dynamic):
+- Tiny elements (< 25×25 pixels)
+- Content area icons without labels (e.g., folder icons in file list)
+- Temporary content that changes every session
+
+**Naming**:
+- Has OCR label → use label as filename (`Search.png`, `AirDrop.png`)
+- No label + stable region → `unlabeled_<region>.png`
+- No label + content area → **SKIP** (don't save)
 
 ### Key Design Decisions
 
