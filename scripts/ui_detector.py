@@ -66,7 +66,7 @@ if let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[S
     with tempfile.NamedTemporaryFile(mode='w', suffix='.swift', delete=False) as f:
         f.write(swift_code)
         swift_file = f.name
-    r = subprocess.run(["swift", swift_file], capture_output=True, text=True, timeout=10)
+    r = subprocess.run(["swift", swift_file], capture_output=True, text=True)
     os.unlink(swift_file)
 
     windows = []
@@ -200,7 +200,7 @@ print(String(data: data, encoding: .utf8)!)
 
     r = subprocess.run(
         ["swift", swift_file, img_path],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True, text=True,
         env={**os.environ, "LANG": "en_US.UTF-8"}
     )
     os.unlink(swift_file)
