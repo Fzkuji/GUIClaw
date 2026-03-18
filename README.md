@@ -11,7 +11,7 @@
 
   <p>
     <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick_Start-blue?style=for-the-badge" /></a>
-    <a href="#-openclaw-integration"><img src="https://img.shields.io/badge/🦞_OpenClaw-red?style=for-the-badge" /></a>
+    <a href="#-quick-start"><img src="https://img.shields.io/badge/🦞_OpenClaw-red?style=for-the-badge" /></a>
     <a href="https://discord.com/invite/clawd"><img src="https://img.shields.io/badge/Discord-7289da?style=for-the-badge&logo=discord&logoColor=white" /></a>
   </p>
 
@@ -147,20 +147,25 @@ CONFIRM  → Screenshot → process list empty → terminated ✅
 
 ## 🚀 Quick Start
 
+**1. Clone & install**
 ```bash
-# 1. Clone & install
 git clone https://github.com/Fzkuji/GUIClaw.git
 cd GUIClaw
 bash scripts/setup.sh
-
-# 2. Grant accessibility permissions
-# System Settings → Privacy & Security → Accessibility → Add Terminal / OpenClaw
-
-# 3. Use with OpenClaw (recommended) or any LLM agent
-# Add to ~/.openclaw/openclaw.json:
-#   "skills": { "entries": { "gui-agent": { "enabled": true } } }
-# Then just chat: "Send a message to John in WeChat"
 ```
+
+**2. Grant accessibility permissions**
+
+System Settings → Privacy & Security → Accessibility → Add Terminal / OpenClaw
+
+**3. Enable in [OpenClaw](https://github.com/openclaw/openclaw)** (recommended)
+
+Add to `~/.openclaw/openclaw.json`:
+```json
+{ "skills": { "entries": { "gui-agent": { "enabled": true } } } }
+```
+
+Then just chat with your agent — it reads `SKILL.md` and handles everything automatically.
 
 ## 🧠 How It Works
 
