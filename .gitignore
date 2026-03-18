@@ -18,3 +18,4 @@ __pycache__/
 /tmp/
 _legacy/
 scripts/test_states.py
+archive/memory_backup/
