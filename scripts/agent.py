@@ -448,6 +448,120 @@ def save_workflow(app_name, workflow_name, steps, description=None, notes=None):
     update_app_summary(app_name)
 
 
+def save_meta_workflow(workflow_name, steps, description=None, notes=None):
+    """Save a cross-app meta-workflow.
+    
+    Meta-workflows can reference single-app workflows via 'call' action,
+    and can nest other meta-workflows for complex multi-step tasks.
+    
+    Step types:
+        {"action": "call", "app": "Claude", "workflow": "check_usage"}
+        {"action": "call", "workflow": "daily_cleanup"}  # meta-workflow
+        {"action": "open", "app": "Chrome"}
+        {"action": "click", "app": "WeChat", "target": "search_bar"}
+        {"action": "copy"}  # Cmd+C, result in $clipboard
+        {"action": "paste"}  # Cmd+V from $clipboard
+        {"action": "observe", "app": "Chrome", "save_as": "$article_text"}
+        {"action": "type", "app": "WeChat", "text": "$article_text"}
+    
+    Variables:
+        $clipboard — system clipboard content
+        $output — output of the previous step
+        $param.xxx — parameters passed when calling this workflow
+    
+    Nesting:
+        A meta-workflow can call other meta-workflows or app workflows.
+        Max nesting depth: 5 (enforced at runtime).
+    
+    Args:
+        workflow_name: snake_case name
+        steps: list of step dicts (each must have 'action', may have 'app')
+        description: one-line summary, max 30 words
+        notes: lessons learned
+    """
+    meta_dir = MEMORY_DIR.parent / "meta_workflows"
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    
+    if description and len(description.split()) > 30:
+        print(f"⚠ Description too long ({len(description.split())} words, max 30). Truncating.")
+        description = " ".join(description.split()[:30])
+    
+    workflow = {
+        "type": "meta",
+        "workflow": workflow_name,
+        "description": description or workflow_name.replace("_", " "),
+        "steps": steps,
+        "notes": notes or [],
+        "last_run": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    
+    path = meta_dir / f"{workflow_name}.json"
+    with open(path, "w") as f:
+        json.dump(workflow, f, indent=2, ensure_ascii=False)
+    print(f"✅ Saved meta-workflow '{workflow_name}' ({len(steps)} steps)")
+
+
+def load_meta_workflow(workflow_name):
+    """Load a meta-workflow. Returns None if not found."""
+    path = MEMORY_DIR.parent / "meta_workflows" / f"{workflow_name}.json"
+    if path.exists():
+        with open(path) as f:
+            return json.load(f)
+    return None
+
+
+def list_all_workflows():
+    """List all workflows across all apps + meta-workflows. Returns compact summary."""
+    results = []
+    
+    # App-specific workflows
+    if MEMORY_DIR.exists():
+        for app_dir in sorted(MEMORY_DIR.iterdir()):
+            wf_dir = app_dir / "workflows"
+            if not wf_dir.exists():
+                continue
+            app_name = app_dir.name
+            for f in sorted(wf_dir.glob("*.json")):
+                with open(f) as fh:
+                    wf = json.load(fh)
+                results.append({
+                    "app": wf.get("app", app_name),
+                    "name": wf.get("workflow", f.stem),
+                    "description": wf.get("description", ""),
+                    "steps": len(wf.get("steps", [])),
+                })
+    
+    # Meta-workflows
+    meta_dir = MEMORY_DIR.parent / "meta_workflows"
+    if meta_dir.exists():
+        for f in sorted(meta_dir.glob("*.json")):
+            with open(f) as fh:
+                wf = json.load(fh)
+            results.append({
+                "app": "[meta]",
+                "name": wf.get("workflow", f.stem),
+                "description": wf.get("description", ""),
+                "steps": len(wf.get("steps", [])),
+            })
+    
+    return results
+
+
+def _show_all_workflows():
+    """Print all workflows across all apps + meta-workflows."""
+    results = list_all_workflows()
+    if not results:
+        print("No workflows found")
+        return
+    
+    current_app = None
+    for wf in results:
+        if wf["app"] != current_app:
+            current_app = wf["app"]
+            print(f"\n{current_app}:")
+        print(f"  {wf['name']} — {wf['description']} ({wf['steps']} steps)")
+
+
 def _show_workflows(app_name, workflow_name=""):
     """List workflows (name + description) or show a specific workflow's full steps."""
     if workflow_name:
@@ -1062,6 +1176,10 @@ ACTIONS = {
         "args": ["app"],
         "optional": ["workflow"],
         "desc": "List or view saved workflows for an app",
+    },
+    "all_workflows": {
+        "fn": lambda **kw: _show_all_workflows(),
+        "desc": "List ALL workflows across all apps + meta-workflows",
     },
     "summary": {
         "fn": lambda app_name: print(json.dumps(

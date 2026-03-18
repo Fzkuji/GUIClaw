@@ -493,6 +493,34 @@ After completing a multi-step GUI task successfully:
 4. **Workflow names**: use snake_case, descriptive (e.g. `smart_scan_cleanup`, `check_usage`)
 5. **Description**: one-line summary, **max 30 words** (e.g. "Scan and clean Mac junk files")
 
+### Meta-Workflows (cross-app tasks)
+
+For tasks spanning multiple apps, use **meta-workflows**:
+
+```python
+save_meta_workflow("share_article_to_wechat", [
+    {"action": "open", "app": "Chrome"},
+    {"action": "observe", "app": "Chrome", "save_as": "$article"},
+    {"action": "copy"},  # Cmd+C → $clipboard
+    {"action": "call", "app": "WeChat", "workflow": "send_message", "params": {"contact": "John", "content": "$clipboard"}},
+], description="Copy Chrome article and send via WeChat")
+```
+
+**`call` action** — invokes another workflow (app-specific or meta):
+- `{"action": "call", "app": "Claude", "workflow": "check_usage"}` — app workflow
+- `{"action": "call", "workflow": "daily_maintenance"}` — meta-workflow (nesting)
+
+**Variables**: `$clipboard`, `$output` (previous step), `$param.xxx` (passed params)
+
+**Nesting depth**: max 5 levels (enforced at runtime)
+
+**When to create meta vs app workflow**:
+- Single app → app workflow (`save_workflow`)
+- Multiple apps → meta-workflow (`save_meta_workflow`)
+- Composition of existing workflows → meta-workflow with `call` steps
+
+**Listing**: `python3 agent.py all_workflows` — shows all app + meta workflows
+
 ### Running a known workflow
 
 DO NOT blindly replay all steps from memory. INSTEAD:
