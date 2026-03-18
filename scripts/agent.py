@@ -324,36 +324,31 @@ def observe_state(app_name):
 
 
 def explore(app_name, question=None):
-    """Use LLM vision to understand current screen state.
+    """Screenshot the target app window for the agent (me) to analyze.
 
-    Crops the target app window, saves it for LLM to analyze.
-    Returns the screenshot path — the calling LLM agent should
-    use the image tool to look at it and decide next steps.
+    The agent calling this script IS the LLM — it uses its own image tool
+    to look at the screenshot. No external API calls needed.
 
-    This is NOT optional when OCR/template match fails.
+    Saves cropped window screenshot to a known path.
+    Returns: state dict with screenshot_path for the agent to view.
     """
     state = observe_state(app_name)
     screenshot_path = state.get("window_screenshot", "/tmp/_observe_s.png")
 
-    # Copy to workspace so LLM can access it
+    # Save to accessible location
     import shutil
     output = str(SKILL_DIR / "detected" / "explore.jpg")
     os.makedirs(os.path.dirname(output), exist_ok=True)
     shutil.copy(screenshot_path, output)
 
-    result = {
-        "screenshot": output,
-        "window": state.get("window"),
-        "ocr_text": state.get("visible_text", [])[:15],
-        "question": question or "What is the current state of this app? What should I do next?",
-    }
+    state["screenshot_path"] = output
+    state["question"] = question or "What is the current state? What should I do next?"
 
     print(f"  🔍 EXPLORE: screenshot saved to {output}", flush=True)
-    print(f"  📋 OCR found: {result['ocr_text'][:5]}", flush=True)
-    print(f"  ❓ Question: {result['question']}", flush=True)
-    print(f"  → Agent should now use image tool to look at {output}", flush=True)
+    print(f"  📋 OCR: {state.get('visible_text', [])[:5]}", flush=True)
+    print(f"  ❓ {state['question']}", flush=True)
 
-    return result
+    return state
 
 
 def find_element_in_window(element_text, state, exact=False, position="any"):
