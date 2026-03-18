@@ -233,16 +233,23 @@ def detect_workflow_conflict(app_name, expected_state, actual_state):
     return False, None
 
 
-def plan_workflow(app_name, context=None):
-    """After learning an app, analyze and create a workflow plan.
+def plan_workflow(app_name, context=None, error_info=None):
+    """Analyze and create a workflow plan.
 
-    1. Load the learned profile
-    2. Analyze available components
-    3. Output analysis for LLM to create workflow
-
+    If error_info is provided, will re-learn first (re-plan on error).
+    
     Returns: (plan, analysis)
     """
-    print(f"  📝 Planning workflow for {app_name}...")
+    reason = "after error" if error_info else "after learn"
+    print(f"  📝 Planning {app_name} ({reason})...")
+
+    # If error provided, re-learn first
+    if error_info:
+        page = context.get("workflow", "main") if context else "main"
+        out, code = run_script("app_memory.py", ["learn", "--app", app_name, "--page", page], timeout=30)
+        if code != 0:
+            return None, f"Failed to learn: {out}"
+        print(f"  🔄 Re-learned {app_name}")
 
     # Load profile
     app_dir = SKILL_DIR / "memory" / "apps" / app_name.lower().replace(" ", "_")
@@ -259,55 +266,13 @@ def plan_workflow(app_name, context=None):
 
     analysis = {
         "app": app_name,
+        "error": error_info,
         "components": list(components.keys()),
         "pages": list(pages.keys()),
         "context": context or {}
     }
 
     print(f"  📋 Found {len(components)} components, {len(pages)} pages")
-    print(f"  Components: {list(components.keys())[:10]}...")
-
-    return None, analysis
-
-
-def replan_workflow(app_name, error_info=None, context=None):
-    """On error, re-learn and re-plan.
-
-    1. Re-learn current app state
-    2. Analyze available components  
-    3. Create new plan
-
-    Returns: (plan, analysis)
-    """
-    print(f"  🔄 Re-planning {app_name} after error...")
-
-    # Step 1: Re-learn
-    page = context.get("workflow", "main") if context else "main"
-    out, code = run_script("app_memory.py", ["learn", "--app", app_name, "--page", page], timeout=30)
-
-    if code != 0:
-        return None, f"Failed to learn: {out}"
-
-    # Step 2: Load profile
-    app_dir = SKILL_DIR / "memory" / "apps" / app_name.lower().replace(" ", "_")
-    profile_path = app_dir / "profile.json"
-
-    if not profile_path.exists():
-        return None, "No profile found after learn"
-
-    with open(profile_path) as f:
-        profile = json.load(f)
-
-    components = profile.get("components", {})
-    print(f"  📋 Found {len(components)} components")
-
-    # Step 3: Analysis for replanning
-    analysis = {
-        "app": app_name,
-        "error": error_info,
-        "available_components": list(components.keys()),
-        "context": context or {}
-    }
 
     return None, analysis
 

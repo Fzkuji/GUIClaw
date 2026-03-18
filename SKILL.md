@@ -272,7 +272,7 @@ python3 scripts/agent.py read_screen --app WeChat
 - **App learned before** → `eval` (check if memory still matches)
   - Match rate ≥ 80% → use existing memory
   - Match rate < 80% → re-learn
-- **Error during execution** → `re-plan` (re-learn + analyze + new plan)
+- **Error during execution** → `plan` (re-learn + analyze + new plan)
 - App name in Chinese? → resolves alias (微信→WeChat, 浏览器→Chrome)
 - Activates the app window before operating
 - Calls the right underlying script (app_memory / gui_agent / ui_detector)
@@ -372,7 +372,7 @@ DO NOT blindly replay all steps from memory. INSTEAD:
 3. Skip steps already done (e.g., scan finished -> skip to Run)
 4. Execute ONLY the next needed step
 5. After each step: verify state changed, then next step
-6. If state does not match any known step: STOP and trigger replan (learn + analyze)
+6. If state does not match any known step: STOP and trigger plan (learn + analyze)
 
 ### Explore (Manual Trigger)
 
@@ -386,7 +386,7 @@ DO NOT blindly replay all steps from memory. INSTEAD:
 3. Save to memory for future reference
 4. Agent analyzes the UI structure
 
-**NOT for:** Workflow execution (use eval/replan for that)
+**NOT for:** Workflow execution (use eval/plan for that)
 
 ## Auto-Learn Rule (MUST follow)
 
