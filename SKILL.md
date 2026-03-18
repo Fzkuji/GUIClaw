@@ -400,21 +400,25 @@ These are hard requirements. Not suggestions. Every step in order.
 
 ### TIMING & CONTEXT REPORTING (MANDATORY — NO EXCEPTIONS)
 
-**Every GUI task MUST report timing and context usage at the end.**
+**Every GUI task MUST report timing and token cost at the end.**
 
 This is enforced at two levels:
 
 1. **Script level**: `agent.py` prints `⏱ Completed (X.Xs)` automatically after every command.
 
-2. **Agent level**: When you finish a GUI task (whether using agent.py or direct cliclick), you MUST include in your final summary:
-   - **⏱ Total time**: from when you received the command to when you report back
-   - **📊 Context usage**: call `session_status` and report current context window usage (tokens used / total)
-   - **🔧 Actions taken**: number of screenshots, clicks, learns performed
+2. **Agent level**: For every GUI task (whether using agent.py or direct cliclick):
 
-**Format:**
-```
-⏱ 45.2s | 📊 Context: 15k/1.0m (1.5%) | 🔧 3 screenshots, 2 clicks, 1 learn
-```
+   **BEFORE starting**: call `session_status`, note the context size (e.g. `📚 Context: 85k/1.0m`)
+   **AFTER completing**: call `session_status` again, compute the delta.
+
+   Report format:
+   ```
+   ⏱ 45.2s | 📊 +10k tokens (85k→95k) | 🔧 3 screenshots, 2 clicks, 1 learn
+   ```
+
+   - **⏱ Total time**: wall clock from command received to report
+   - **📊 Token delta**: context before → after, and the increment
+   - **🔧 Actions taken**: number of screenshots, clicks, learns performed
 
 **This applies even when you bypass agent.py and use cliclick directly.**
 **No exceptions. No "I forgot". Write it every time.**
