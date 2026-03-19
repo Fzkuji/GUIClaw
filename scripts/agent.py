@@ -390,47 +390,14 @@ def resolve_app_name(raw_name):
 
 def activate_app(app_name):
     """Bring app to front."""
-    try:
-        subprocess.run(["osascript", "-e",
-            f'tell application "System Events" to set frontmost of process "{app_name}" to true'],
-            capture_output=True, timeout=5)
-        time.sleep(0.3)
-    except:
-        subprocess.run(["open", "-a", app_name], capture_output=True, timeout=5)
-        time.sleep(0.5)
+    from platform_input import activate_app as pi_activate
+    pi_activate(app_name)
 
 
 def get_window_bounds(app_name):
-    """Get the MAIN window position and size (largest window, not status bar panels).
-
-    Some apps like CleanMyMac have multiple windows (status bar panel, sidebar, main window).
-    We want the largest one.
-    """
-    try:
-        r = subprocess.run(["osascript", "-l", "JavaScript", "-e", f'''
-var se = Application("System Events");
-var ws = se.processes["{app_name}"].windows();
-var best = null;
-var bestArea = 0;
-for (var i = 0; i < ws.length; i++) {{
-    try {{
-        var p = ws[i].position();
-        var s = ws[i].size();
-        var area = s[0] * s[1];
-        if (area > bestArea) {{
-            bestArea = area;
-            best = [p[0], p[1], s[0], s[1]];
-        }}
-    }} catch(e) {{}}
-}}
-if (best) best.join(","); else "";
-'''], capture_output=True, text=True, timeout=5)
-        parts = r.stdout.strip().split(",")
-        if len(parts) == 4:
-            return tuple(int(x) for x in parts)
-    except:
-        pass
-    return None
+    """Get the MAIN window position and size (largest window)."""
+    from platform_input import get_window_bounds as pi_get_bounds
+    return pi_get_bounds(app_name)
 
 
 # ═══════════════════════════════════════════
@@ -1015,7 +982,7 @@ def safe_click(app_name, element_text, state=None, exact=False, position="any"):
     if not exists:
         return False, f"Element '{element_text}' not found (exact={exact}, pos={position})"
 
-    subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{cx},{cy}"], check=True)
+    from platform_input import click_at; click_at(cx, cy)
 
     # POST-CLICK: verify state changed
     time.sleep(0.5)
@@ -1095,7 +1062,7 @@ def poll_and_click(app_name, target_text, max_wait=30, interval=2,
         exists, cx, cy = verify_element_exists(app_name, target_text, state,
                                                 exact=exact, position=position)
         if exists:
-            subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{cx},{cy}"], check=True)
+            from platform_input import click_at; click_at(cx, cy)
             return True, f"Clicked '{target_text}' at ({cx},{cy})"
         time.sleep(interval)
 
@@ -1155,7 +1122,8 @@ def click_and_wait(x, y, app_name, next_target, max_wait=30):
 
     Returns: (found, next_x, next_y)
     """
-    subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{x},{y}"], check=True)
+    from platform_input import click_at
+    click_at(x, y)
     return wait_for_element(app_name, next_target, max_wait=max_wait)
 
 
@@ -1237,37 +1205,28 @@ def action_open_app(app_name):
 
 
 def action_navigate_browser(url):
-    """Navigate browser to URL — visually: activate Chrome, Cmd+L address bar, paste URL, Enter."""
+    """Navigate browser to URL — visually: activate, Cmd+L, paste URL, Enter."""
+    from platform_input import send_keys, paste_text, set_clipboard, key_press, key_combo
     app_name = "Google Chrome"
     activate_app(app_name)
     time.sleep(0.5)
 
     # Cmd+L to focus address bar
-    subprocess.run(["osascript", "-e",
-        'tell application "System Events" to keystroke "l" using command down'],
-        capture_output=True, timeout=5)
+    key_combo("command", "l")
     time.sleep(0.3)
 
-    # Paste URL into address bar
-    subprocess.run(["bash", "-c", f'echo -n "{url}" | LANG=en_US.UTF-8 pbcopy'],
-        capture_output=True, timeout=5)
+    # Paste URL
+    set_clipboard(url)
     time.sleep(0.1)
-    subprocess.run(["osascript", "-e",
-        'tell application "System Events" to keystroke "v" using command down'],
-        capture_output=True, timeout=5)
+    key_combo("command", "v")
     time.sleep(0.3)
 
     # Dismiss autocomplete dropdown, re-select URL, then Enter
-    subprocess.run(["/opt/homebrew/bin/cliclick", "kp:esc"],
-        capture_output=True, timeout=5)
+    key_press("esc")
     time.sleep(0.2)
-    subprocess.run(["osascript", "-e",
-        'tell application "System Events" to keystroke "l" using command down'],
-        capture_output=True, timeout=5)
+    key_combo("command", "l")
     time.sleep(0.2)
-    subprocess.run(["osascript", "-e",
-        'tell application "System Events" to key code 36'],
-        capture_output=True, timeout=5)
+    key_press("return")
     time.sleep(3)
 
     print(f"  🌐 Navigated to {url}")
@@ -1319,66 +1278,28 @@ def action_list_components(app_name):
 
 
 def action_key_press(key, app_name=None):
-    """Press a key or key combo. Single keys via cliclick, combos via osascript."""
+    """Press a key or key combo via pynput."""
+    from platform_input import send_keys, activate_app as pi_activate
     if app_name:
-        activate_app(resolve_app_name(app_name))
+        pi_activate(resolve_app_name(app_name))
         time.sleep(0.3)
 
-    # Check if it's a combo (e.g., "command-v", "command-shift-s")
-    if "-" in key and any(mod in key.lower() for mod in ["command", "shift", "option", "control"]):
-        parts = key.lower().split("-")
-        char = parts[-1]
-        modifiers = parts[:-1]
-        mod_map = {
-            "command": "command down",
-            "shift": "shift down",
-            "option": "option down",
-            "control": "control down",
-        }
-        using = ", ".join(mod_map[m] for m in modifiers if m in mod_map)
-        # Handle special keys
-        special = {"return": 36, "enter": 36, "tab": 48, "esc": 53, "escape": 53,
-                   "delete": 51, "space": 49, "up": 126, "down": 125, "left": 123, "right": 124}
-        if char in special:
-            script = f'tell application "System Events" to key code {special[char]} using {{{using}}}'
-        else:
-            script = f'tell application "System Events" to keystroke "{char}" using {{{using}}}'
-        subprocess.run(["osascript", "-e", script], capture_output=True, timeout=5)
-    else:
-        # Single key — use osascript for return/enter (cliclick kp:return doesn't work in some apps like WeChat)
-        special_single = {"return": 36, "enter": 36, "tab": 48, "esc": 53, "escape": 53,
-                          "delete": 51, "space": 49}
-        if key.lower() in special_single:
-            subprocess.run(["osascript", "-e",
-                f'tell application "System Events" to key code {special_single[key.lower()]}'],
-                capture_output=True, timeout=5)
-        else:
-            # Other keys via cliclick (arrows, function keys, etc.)
-            key_map = {"enter": "return", "escape": "esc"}
-            cliclick_key = key_map.get(key.lower(), key.lower())
-            subprocess.run(["/opt/homebrew/bin/cliclick", f"kp:{cliclick_key}"], capture_output=True, timeout=5)
-
+    send_keys(key)
     print(f"  ⌨️ Pressed {key}")
     return True
 
 
 def action_type_text(text, app_name=None):
-    """Type or paste text. Uses pbcopy+Cmd+V for non-ASCII, cliclick for ASCII."""
+    """Type or paste text. ASCII → type, CJK/special → paste via clipboard."""
+    from platform_input import type_text as pi_type, paste_text, activate_app as pi_activate
     if app_name:
-        activate_app(resolve_app_name(app_name))
+        pi_activate(resolve_app_name(app_name))
         time.sleep(0.3)
 
-    # Check if text is pure ASCII
     if all(ord(c) < 128 for c in text):
-        subprocess.run(["/opt/homebrew/bin/cliclick", f"t:{text}"], capture_output=True, timeout=5)
+        pi_type(text)
     else:
-        # Non-ASCII: paste via clipboard
-        subprocess.run(["bash", "-c", f'echo -n {shlex.quote(text)} | LANG=en_US.UTF-8 pbcopy'],
-            capture_output=True, timeout=5)
-        time.sleep(0.1)
-        subprocess.run(["osascript", "-e",
-            'tell application "System Events" to keystroke "v" using command down'],
-            capture_output=True, timeout=5)
+        paste_text(text)
 
     print(f"  ⌨️ Typed: {text[:50]}{'...' if len(text) > 50 else ''}")
     return True

@@ -1104,7 +1104,7 @@ def click_component(app_name, component_name, verify=True):
         screen_x = win_x + sys_comp["rel_x"]
         screen_y = win_y + sys_comp["rel_y"]
         print(f"  🎯 System component '{component_name}' → screen({screen_x},{screen_y})")
-        subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{screen_x},{screen_y}"],
+        from platform_input import click_at; click_at(screen_x, screen_y) #
                        capture_output=True, timeout=5)
         return True, f"Clicked system component {component_name}"
 
@@ -1138,7 +1138,7 @@ def click_component(app_name, component_name, verify=True):
             return False, f"Low confidence ({conf}), not clicking"
 
     # 5. Click
-    subprocess.run(["/opt/homebrew/bin/cliclick", f"c:{screen_x},{screen_y}"], check=True)
+    from platform_input import click_at; click_at(screen_x, screen_y) # check=True)
     return True, f"Clicked '{component_name}' at ({screen_x},{screen_y}) conf={conf}"
 
 
