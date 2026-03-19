@@ -31,6 +31,83 @@ MEMORY_DIR = SKILL_DIR / "memory" / "apps"
 
 BROWSER_APPS = {"Google Chrome", "Safari", "Firefox", "Arc", "Microsoft Edge", "Brave Browser"}
 
+# Session tracker — logs every action for final report
+SESSION_LOG = SKILL_DIR / "memory" / ".session_log.json"
+
+
+def _log_action(action_name, elapsed, success, app=None):
+    """Append action to session log."""
+    import json
+    log = []
+    if SESSION_LOG.exists():
+        try:
+            with open(SESSION_LOG) as f:
+                log = json.load(f)
+        except:
+            log = []
+    log.append({
+        "action": action_name,
+        "app": app,
+        "elapsed": round(elapsed, 1),
+        "success": success,
+        "time": time.strftime("%H:%M:%S"),
+    })
+    SESSION_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(SESSION_LOG, "w") as f:
+        json.dump(log, f)
+
+
+def action_report():
+    """Print session summary and clear the log."""
+    import json
+    if not SESSION_LOG.exists():
+        print("  📊 No actions logged this session.")
+        return True
+
+    with open(SESSION_LOG) as f:
+        log = json.load(f)
+
+    if not log:
+        print("  📊 No actions logged this session.")
+        return True
+
+    total_time = sum(a["elapsed"] for a in log)
+    actions_by_type = {}
+    for a in log:
+        actions_by_type[a["action"]] = actions_by_type.get(a["action"], 0) + 1
+
+    screenshots = actions_by_type.get("read_screen", 0) + actions_by_type.get("explore", 0)
+    clicks = actions_by_type.get("click", 0)
+    learns = actions_by_type.get("learn", 0) + actions_by_type.get("learn_site", 0)
+    navigates = actions_by_type.get("navigate", 0)
+    keys = actions_by_type.get("key", 0)
+    types = actions_by_type.get("type", 0)
+
+    parts = []
+    if learns: parts.append(f"{learns} learn")
+    if screenshots: parts.append(f"{screenshots} screenshot")
+    if clicks: parts.append(f"{clicks} click")
+    if navigates: parts.append(f"{navigates} navigate")
+    if keys: parts.append(f"{keys} keypress")
+    if types: parts.append(f"{types} type")
+
+    if total_time < 60:
+        time_str = f"{total_time:.1f}s"
+    else:
+        time_str = f"{total_time/60:.1f}min"
+
+    print(f"\n📊 Session Report")
+    print(f"⏱ Total: {time_str} | 🔧 {', '.join(parts) or 'no actions'}")
+    print(f"Actions: {len(log)} total")
+    for a in log:
+        status = "✅" if a["success"] else "❌"
+        app_str = f" ({a['app']})" if a.get("app") else ""
+        print(f"  {a['time']} {status} {a['action']}{app_str} — {a['elapsed']}s")
+
+    # Clear log
+    SESSION_LOG.unlink(missing_ok=True)
+    return True
+
 
 def get_retina_scale():
     """Detect display scale factor (Retina 2x, non-Retina 1x, etc).
@@ -1336,6 +1413,10 @@ ACTIONS = {
         "fn": lambda **kw: _show_all_workflows(),
         "desc": "List ALL workflows across all apps + meta-workflows",
     },
+    "report": {
+        "fn": action_report,
+        "desc": "Print session summary (all actions, timing) and clear log",
+    },
     "summary": {
         "fn": lambda app_name: print(json.dumps(
             json.load(open(MEMORY_DIR / app_name.lower().replace(" ", "_") / "summary.json"))
@@ -1477,6 +1558,10 @@ def main():
         else:
             _time_str = f"{_elapsed/60:.1f}min"
         
+        # Log action to session tracker
+        _log_action(action_name, _elapsed, result is not False, 
+                    app=kwargs.get("app_name") or kwargs.get("app"))
+
         if result is True:
             print(f"\n✅ Done ({_time_str})")
         elif result is False:
