@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GUI task cost tracker — records baseline and computes deltas."""
+"""GUI task tracker — records baseline and computes deltas for time, tokens, and operations."""
 
 import argparse
 import json
@@ -72,6 +72,7 @@ def report(args):
     tokens_in_delta = (args.tokens_in or 0) - state["tokens_in"]
     tokens_out_delta = (args.tokens_out or 0) - state["tokens_out"]
     cache_delta = (args.cache_hits or 0) - state["cache_hits"]
+    total_tokens = tokens_in_delta + tokens_out_delta + cache_delta
 
     # Format time
     if elapsed < 60:
@@ -83,29 +84,12 @@ def report(args):
 
     # Format tokens
     def fmt_tokens(n):
-        if n < 1000:
+        if abs(n) < 1000:
             return str(n)
-        elif n < 1_000_000:
+        elif abs(n) < 1_000_000:
             return f"{n/1000:.1f}k"
         else:
             return f"{n/1_000_000:.2f}M"
-
-    # Cost estimate (approximate, per-model)
-    # Claude Opus 4: $15/M input, $75/M output (cached input $1.875/M)
-    # Claude Sonnet 4.5: $3/M input, $15/M output
-    model = args.model or "opus"
-    if "opus" in model:
-        cost_in = tokens_in_delta * 15 / 1_000_000
-        cost_out = tokens_out_delta * 75 / 1_000_000
-        cost_cache = cache_delta * 1.875 / 1_000_000
-    elif "sonnet" in model:
-        cost_in = tokens_in_delta * 3 / 1_000_000
-        cost_out = tokens_out_delta * 15 / 1_000_000
-        cost_cache = cache_delta * 0.375 / 1_000_000
-    else:
-        cost_in = cost_out = cost_cache = 0
-
-    total_cost = cost_in + cost_out + cost_cache
 
     # Build report
     ops = []
@@ -120,7 +104,7 @@ def report(args):
     print(f"⏱  Duration:    {time_str}")
     print(f"📥 Tokens in:   {fmt_tokens(tokens_in_delta)} (new) + {fmt_tokens(cache_delta)} (cached)")
     print(f"📤 Tokens out:  {fmt_tokens(tokens_out_delta)}")
-    print(f"💰 Est. cost:   ${total_cost:.4f}")
+    print(f"📦 Total:       {fmt_tokens(total_tokens)}")
     print(f"🔧 Operations:  {', '.join(ops) if ops else 'none tracked'}")
     if state.get("notes"):
         print(f"📝 Notes:")
@@ -138,9 +122,8 @@ def report(args):
         "tokens_in": tokens_in_delta,
         "tokens_out": tokens_out_delta,
         "cache_hits": cache_delta,
-        "cost_usd": round(total_cost, 4),
+        "total_tokens": total_tokens,
         "operations": {k: state.get(k, 0) for k in ["screenshots", "clicks", "learns", "detects", "image_calls"]},
-        "model": model,
         "notes": state.get("notes", []),
     }
     log_file = os.path.join(log_dir, "task_history.jsonl")
@@ -162,23 +145,24 @@ def history(args):
         lines = f.readlines()
     limit = args.limit or 10
     entries = [json.loads(l) for l in lines[-limit:]]
-    
-    total_cost = 0
-    print(f"{'Task':<30} {'Duration':>10} {'Tokens':>12} {'Cost':>10} {'Date'}")
-    print("-" * 85)
+
+    print(f"{'Task':<30} {'Duration':>10} {'Tokens':>12} {'Date'}")
+    print("-" * 70)
     for e in entries:
-        total_tokens = e["tokens_in"] + e["tokens_out"] + e.get("cache_hits", 0)
+        total = e.get("total_tokens", e["tokens_in"] + e["tokens_out"] + e.get("cache_hits", 0))
         def fmt(n):
-            return f"{n/1000:.1f}k" if n >= 1000 else str(n)
+            return f"{n/1000:.1f}k" if abs(n) >= 1000 else str(n)
         dur = f"{e['duration_s']:.0f}s" if e["duration_s"] < 60 else f"{e['duration_s']/60:.1f}m"
-        print(f"{e['task']:<30} {dur:>10} {fmt(total_tokens):>12} ${e['cost_usd']:>8.4f} {e['timestamp']}")
-        total_cost += e["cost_usd"]
-    print("-" * 85)
-    print(f"{'Total':>54} ${total_cost:.4f}  ({len(entries)} tasks)")
+        print(f"{e['task']:<30} {dur:>10} {fmt(total):>12} {e['timestamp']}")
+    print("-" * 70)
+    total_tokens = sum(e.get("total_tokens", e["tokens_in"] + e["tokens_out"] + e.get("cache_hits", 0)) for e in entries)
+    def fmt_t(n):
+        return f"{n/1000:.1f}k" if abs(n) >= 1000 else str(n)
+    print(f"{'Total':>42} {fmt_t(total_tokens):>12}  ({len(entries)} tasks)")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GUI task cost tracker")
+    parser = argparse.ArgumentParser(description="GUI task tracker")
     sub = parser.add_subparsers(dest="command")
 
     p_start = sub.add_parser("start", help="Begin tracking a task")
@@ -198,7 +182,6 @@ def main():
     p_report.add_argument("--tokens-in", type=int, help="Final input tokens")
     p_report.add_argument("--tokens-out", type=int, help="Final output tokens")
     p_report.add_argument("--cache-hits", type=int, help="Final cache hit tokens")
-    p_report.add_argument("--model", help="Model name for cost calc")
 
     p_hist = sub.add_parser("history", help="Show task history")
     p_hist.add_argument("--limit", type=int, default=10)
