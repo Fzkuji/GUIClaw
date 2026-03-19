@@ -1265,7 +1265,8 @@ def action_navigate_browser(url):
         'tell application "System Events" to keystroke "l" using command down'],
         capture_output=True, timeout=5)
     time.sleep(0.2)
-    subprocess.run(["/opt/homebrew/bin/cliclick", "kp:return"],
+    subprocess.run(["osascript", "-e",
+        'tell application "System Events" to key code 36'],
         capture_output=True, timeout=5)
     time.sleep(3)
 
@@ -1344,10 +1345,18 @@ def action_key_press(key, app_name=None):
             script = f'tell application "System Events" to keystroke "{char}" using {{{using}}}'
         subprocess.run(["osascript", "-e", script], capture_output=True, timeout=5)
     else:
-        # Single key via cliclick
-        key_map = {"enter": "return", "escape": "esc"}
-        cliclick_key = key_map.get(key.lower(), key.lower())
-        subprocess.run(["/opt/homebrew/bin/cliclick", f"kp:{cliclick_key}"], capture_output=True, timeout=5)
+        # Single key — use osascript for return/enter (cliclick kp:return doesn't work in some apps like WeChat)
+        special_single = {"return": 36, "enter": 36, "tab": 48, "esc": 53, "escape": 53,
+                          "delete": 51, "space": 49}
+        if key.lower() in special_single:
+            subprocess.run(["osascript", "-e",
+                f'tell application "System Events" to key code {special_single[key.lower()]}'],
+                capture_output=True, timeout=5)
+        else:
+            # Other keys via cliclick (arrows, function keys, etc.)
+            key_map = {"enter": "return", "escape": "esc"}
+            cliclick_key = key_map.get(key.lower(), key.lower())
+            subprocess.run(["/opt/homebrew/bin/cliclick", f"kp:{cliclick_key}"], capture_output=True, timeout=5)
 
     print(f"  ⌨️ Pressed {key}")
     return True
