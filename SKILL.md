@@ -106,14 +106,14 @@ Compare `session_status` from STEP 0 vs now.
 
 ## Key Principles
 
-1. **Vision-driven, no shortcuts** — every GUI interaction goes through the visual pipeline (screenshot → detect → match → click). Do not use system commands (`open <url>`, `osascript tell app to set URL`, CLI tools) to manipulate app state. Only allowed system calls: `activate` (bring window to front), `screencapture` (take screenshot), `cliclick` (click/type after visual detection provides coordinates).
+1. **Vision-driven, no shortcuts** — every GUI interaction goes through the visual pipeline (screenshot → detect → match → click). Do not use system commands (`open <url>`, `osascript tell app to set URL`, CLI tools) to manipulate app state. Only allowed: `activate` (bring window to front), `screencapture` (take screenshot), `platform_input.py` (click/type via pynput after visual detection provides coordinates). **Screenshot before AND after every click.**
 2. **Memory first, detect second** — template match before YOLO+OCR
 3. **Template > OCR > YOLO > LLM** — cheapest method first
 4. **Relative coordinates** — all positions relative to window top-left
 5. **Window-based, not screen-based** — capture and operate within target window only
 6. **Paste > Type** for CJK text and special chars
 7. **Learn incrementally** — save new components after each interaction
-8. **Integer coordinates only** — cliclick requires integers
+8. **Integer coordinates only** — pynput uses logical screen coordinates (integers)
 9. **Learn once, match forever** — UI positions are stable unless app updates
 
 ## Safety Rules

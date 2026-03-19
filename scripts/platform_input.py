@@ -275,6 +275,12 @@ def capture_window(app_name, out_path=None):
 # Convenience / high-level
 # ═══════════════════════════════════════════
 
+def screenshot(path="/tmp/gui_agent_screen.png"):
+    """Take a full-screen screenshot and return the path."""
+    subprocess.run(["screencapture", "-x", path], capture_output=True, timeout=5)
+    return path
+
+
 def click_at(x, y):
     """Simple left click (most common operation)."""
     mouse_click(x, y)

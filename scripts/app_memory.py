@@ -1176,13 +1176,19 @@ def match_on_fullscreen(app_name, component_name, threshold=0.8):
 def click_component(app_name, component_name, verify=True):
     """Find a component by template match on FULL SCREEN and click it.
 
+    Full protocol: screenshot before → match → click → screenshot after → verify.
     No window position needed. Match directly on screen → click.
-    Returns: (success, message)
-    """
-    from platform_input import click_at, verify_frontmost, activate_app as pi_activate
 
-    # 0. System component? Match on full screen too (no more fixed offsets)
-    # System components are small (traffic lights) — still use relative for now
+    Returns: (success, message)
+        Also saves before/after screenshots to /tmp/ for debugging.
+    """
+    from platform_input import click_at, verify_frontmost, activate_app as pi_activate, screenshot
+
+    # PRE-CLICK: screenshot
+    before_path = screenshot("/tmp/gui_before_click.png")
+    print(f"  📸 Pre-click screenshot saved")
+
+    # 0. System component? Use fixed position relative to window
     if component_name.startswith("sys_") and component_name in MACOS_SYSTEM_COMPONENTS:
         img_path, win_x, win_y, win_w, win_h = capture_window(app_name)
         if not img_path:
@@ -1192,9 +1198,12 @@ def click_component(app_name, component_name, verify=True):
         screen_y = win_y + sys_comp["rel_y"]
         print(f"  🎯 System component '{component_name}' → screen({screen_x},{screen_y})")
         click_at(screen_x, screen_y)
+        time.sleep(0.5)
+        screenshot("/tmp/gui_after_click.png")
+        print(f"  📸 Post-click screenshot saved")
         return True, f"Clicked system component {component_name}"
 
-    # 1. Match on full screen — no window offset calculation needed
+    # 1. Match on full screen
     found, screen_x, screen_y, conf = match_on_fullscreen(app_name, component_name)
 
     if not found:
@@ -1209,8 +1218,12 @@ def click_component(app_name, component_name, verify=True):
     # 3. Click
     click_at(screen_x, screen_y)
 
-    # 4. Post-click: verify we're still in the right app
+    # POST-CLICK: screenshot + verify
     time.sleep(0.5)
+    after_path = screenshot("/tmp/gui_after_click.png")
+    print(f"  📸 Post-click screenshot saved")
+
+    # 4. Verify we're still in the right app
     is_correct, actual_app = verify_frontmost(app_name)
     if not is_correct:
         print(f"  ⚠️ APP SWITCHED! Expected '{app_name}', now in '{actual_app}'")
@@ -1218,6 +1231,18 @@ def click_component(app_name, component_name, verify=True):
         pi_activate(app_name)
         time.sleep(0.5)
         return False, f"Click caused app switch to '{actual_app}', re-activated {app_name}"
+
+    # 5. Verify screen actually changed (basic check)
+    import cv2
+    before_img = cv2.imread(before_path)
+    after_img = cv2.imread(after_path)
+    if before_img is not None and after_img is not None:
+        diff = cv2.absdiff(before_img, after_img)
+        change_pct = (diff > 20).sum() / diff.size * 100
+        if change_pct < 0.1:
+            print(f"  ⚠️ Screen barely changed ({change_pct:.2f}%) — click may not have worked")
+        else:
+            print(f"  ✅ Screen changed ({change_pct:.1f}%)")
 
     return True, f"Clicked '{component_name}' at ({screen_x},{screen_y}) conf={conf}"
 

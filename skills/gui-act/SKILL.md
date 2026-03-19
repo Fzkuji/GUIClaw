@@ -5,13 +5,33 @@ description: "Execute GUI actions — click components, type text, send messages
 
 # Act — Execute and Verify
 
-Detection priority: **Template Match (0.3s) → OCR (1.6s) → YOLO (0.3s) → LLM (last resort)**
+Detection priority: **Template Match on full screen (0.3s) → YOLO (0.3s) → LLM (last resort)**
+
+> **OCR is removed.** Do NOT use OCR coordinates for clicking. Use template matching
+> (saved component images matched on full-screen screenshot) or visual analysis via
+> the `image` tool. OCR text is unreliable for positioning (mixes content from
+> overlapping windows, wrong coordinate systems).
+
+## MANDATORY: Screenshot Before AND After Every Click
+
+```
+1. Screenshot (full screen) → analyze with image tool
+2. Confirm target is visible and correct
+3. Click via template match (app_memory.py click) or calculated position
+4. Screenshot (full screen) → analyze with image tool
+5. Confirm screen changed as expected
+6. If NO change → click failed. Re-analyze, don't repeat blindly.
+7. If WRONG app in front → Esc, re-activate target app, re-analyze.
+```
+
+This is NOT optional. Every single click gets a before/after screenshot.
+`click_component` does this automatically. Manual clicks must do it explicitly.
 
 ## Pre-Click Verify (before every click)
 
-1. Is the element actually on screen RIGHT NOW?
+1. Is the element actually on screen RIGHT NOW? (screenshot + image analysis)
 2. Is it the CORRECT element (not similar name in another window)?
-3. Am I clicking inside the correct app window bounds?
+3. Is the TARGET APP in the foreground? (check menu bar in screenshot)
 4. If ANY is NO → re-observe. Do not click.
 
 ## Clicking a Known Component
@@ -36,43 +56,63 @@ Manual flow:
    d. Click
 ```
 
-## Input Methods
+## Input Methods (via platform_input.py)
 
-```bash
-# Click (logical screen coords, integers)
-/opt/homebrew/bin/cliclick c:<x>,<y>
+All input goes through `platform_input.py` (cross-platform, uses pynput):
 
-# Type ASCII only
-cliclick t:"text"
+```python
+from platform_input import click_at, type_text, paste_text, key_press, key_combo, set_clipboard, screenshot
 
-# Paste CJK/special chars (MUST for Chinese)
-LANG=en_US.UTF-8 pbcopy <<< "中文"
-osascript -e 'tell app "System Events" to keystroke "v" using command down'
+# Click (logical screen coords)
+click_at(x, y)
 
-# Key press (return, esc, tab, delete, space, arrow-*, f1-f16)
-cliclick kp:return
+# Type ASCII
+type_text("hello")
 
-# Keyboard shortcut
-osascript -e 'tell app "System Events" to keystroke "v" using command down'
+# Paste CJK/special chars (clipboard + Cmd+V)
+paste_text("中文")
+
+# Key press
+key_press("return")   # also: esc, tab, delete, space
+
+# Key combo
+key_combo("command", "v")
+key_combo("command", "shift", "s")
+
+# Screenshot (for verification)
+screenshot("/tmp/check.png")
 ```
+
+**Never use cliclick or osascript for input.** Those are macOS-only and removed.
 
 ## Sending Messages
 
-**Pre-Send Verify** — this exists because of a real bug that sent messages to the wrong person:
+**No hardcoded flow.** Sending messages is a WORKFLOW, not a built-in action.
+New AI must explore the app to learn how to send, then save as workflow.
 
-1. OCR the chat HEADER (top 120px) — is the correct contact open?
-2. Is the message text in the input field?
-3. If NO → ABORT. Do not send.
+`agent.py send_message` prints step-by-step guidance but does NOT execute.
+The agent must execute each step manually with screenshot verification.
 
-Full message flow:
+### Generic steps (adapt per app):
 ```
-1. Activate app, get window bounds
-2. Navigate to contact (sidebar click or search)
-3. ⚠️ VERIFY: OCR chat header — correct name? If wrong → ABORT
-4. Click input field → paste message (pbcopy + Cmd+V)
-5. Send: cliclick kp:return
-6. Verify: OCR chat area, confirm first 10 chars visible
+1. SCREENSHOT → confirm app is frontmost
+2. Find contact (search bar or scroll chat list)
+3. SCREENSHOT → verify contact found (not internet search suggestion!)
+4. Click contact
+5. SCREENSHOT → verify chat header shows correct name
+6. Click message input field
+7. Paste message (set_clipboard + Cmd+V)
+8. SCREENSHOT → verify text is in input field
+9. Press Enter to send
+10. SCREENSHOT → verify message appears as sent bubble
 ```
+
+### After first success → save workflow:
+```bash
+python3 agent.py save_workflow --app AppName --name send_message --steps '[...]'
+```
+
+Next time, `agent.py send_message` will load the saved workflow.
 
 ## Waiting for Async UI Changes
 

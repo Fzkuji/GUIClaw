@@ -1123,38 +1123,59 @@ def click_and_wait(x, y, app_name, next_target, max_wait=30):
 
 
 def action_send_message(app_name, contact, message):
-    """Send a message in a chat app. Full protocol: observe → verify → act → confirm."""
+    """Send a message in a chat app.
+
+    This is a HELPER that prints guidance for the agent to follow.
+    The actual sending should be done step-by-step by the agent using
+    click, type, key, and screenshot verification at each step.
+
+    New AI without workflow: follow the printed steps manually.
+    With saved workflow: load and follow it.
+
+    Returns: False (agent must execute steps manually and verify each one)
+    """
     app_name = resolve_app_name(app_name)
 
-    # STEP 0: Observe current state
-    print(f"  👁 Observing state...")
-    state = observe_state(app_name)
-    print(f"    Frontmost: {state['frontmost']}, Window: {state.get('window')}")
-    print(f"    Visible: {state['visible_text'][:5]}")
+    # Check for saved workflow first
+    workflow_dir = SKILL_DIR / "memory" / "apps" / app_name.lower().replace(" ", "_") / "workflows"
+    send_wf = workflow_dir / "send_message.json" if workflow_dir.exists() else None
 
-    # Ensure app is ready
-    ensure_app_ready(app_name, workflow="send_message")
+    if send_wf and send_wf.exists():
+        import json
+        wf = json.load(open(send_wf))
+        print(f"  📋 Found workflow: send_message")
+        print(f"  📋 Steps: {json.dumps(wf.get('steps', []), indent=2, ensure_ascii=False)}")
+        print(f"  ℹ️ Follow these steps. Screenshot and verify after EACH step.")
+        return True
 
-    print(f"  📨 Sending to {contact}: {message}")
-    out, code = run_script("gui_agent.py", [
-        "task", "send_message", "--app", app_name,
-        "--param", f"contact={contact}",
-        "--param", f"message={message}",
-    ], timeout=30)
-    print(out)
+    # No workflow — print generic guidance
+    print(f"""
+  📨 SEND MESSAGE: {app_name} → {contact}: "{message}"
 
-    if code != 0:
-        print(f"  ❌ Send failed. Re-learning {app_name} for retry...")
-        learn_out, learn_code = run_script("app_memory.py", ["learn", "--app", app_name], timeout=30)
-        print(learn_out)
-        print(f"  🔄 Re-learned. Observe new state before retrying.")
-        new_state = observe_state(app_name)
-        print(f"    Frontmost: {new_state['frontmost']}, Window: {new_state.get('window')}")
-        print(f"    Visible: {new_state['visible_text'][:5]}")
-        # Don't auto-retry — return failure and let agent re-plan with fresh knowledge
-        return False
+  ⚠️ No saved workflow. Follow these steps manually:
 
-    return True
+  1. SCREENSHOT full screen — confirm {app_name} is visible
+  2. SEARCH for contact "{contact}" (use search bar or scroll chat list)
+  3. SCREENSHOT — verify search results, find CONTACT result (not internet search)
+  4. CLICK the correct contact result
+  5. SCREENSHOT — verify chat header shows "{contact}"
+     If wrong contact → Esc, re-search
+  6. CLICK the message input field (bottom of chat area)
+  7. PASTE the message: "{message}"
+  8. SCREENSHOT — verify message text is in the input field
+  9. PRESS Enter to send
+  10. SCREENSHOT — verify message appears as sent bubble (green, right side)
+
+  ⚠️ CRITICAL RULES:
+  - Screenshot BEFORE and AFTER every click
+  - If screen doesn't change after click → click failed, retry
+  - If wrong app comes to front → Esc, re-activate target app
+  - Never skip verification steps
+
+  After success, save workflow:
+    python3 agent.py save_workflow --app {app_name} --name send_message --steps <json>
+""")
+    return False
 
 
 def action_read_messages(app_name, contact=None):
