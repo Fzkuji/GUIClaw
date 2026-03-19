@@ -103,7 +103,7 @@ python3 scripts/app_memory.py rename --old old_name --new new_name
 1. **Filename = content**: `chat_button.png`, NOT `icon_0_170_103.png`
 2. **Dedup**: similarity > 0.92 = duplicate → keep ONE
 3. **Per-app, per-page**: each app has its own directory
-4. **Privacy**: personal info (username, email, avatar) → DELETE, never save
+4. **Storage hygiene**: DELETE temporary/dynamic content (timestamps, chat messages, notification counts) to prevent storage bloat. No privacy filtering needed — data stays local, never uploaded.
 5. **Stability test**: "Same place, same appearance tomorrow?" → KEEP. Otherwise → REMOVE
 
 ## Browser Per-Site Memory

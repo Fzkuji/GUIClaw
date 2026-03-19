@@ -28,15 +28,16 @@ python3 scripts/agent.py learn --app AppName
    e. Crops each element → saves to memory/apps/<appname>/components/
    f. Reports unlabeled icons
 3. YOU identify all components:
-   a. Use `image` tool to view each cropped image (batch up to 20)
+   a. Use `image` tool to view each cropped image (**one at a time** for accuracy)
    b. For each: read text, describe icon, determine actual name
-   c. ⚠️ PRIVACY: personal info (username, email, avatar) → DELETE
-   d. Verify _find_nearest_text names (often wrong in dense UIs)
-   e. Rename: app_memory.py rename --old X --new Y
+   c. Only label GENERIC UI components (buttons, icons, tabs, nav)
+   d. DELETE temporary/dynamic content (to prevent storage bloat)
+   e. Verify _find_nearest_text names (often wrong in dense UIs)
+   f. Rename: app_memory.py rename --old X --new Y
 4. After identification + task complete:
    a. Run: agent.py cleanup --app AppName
    b. Remove dynamic content (timestamps, message previews)
-   c. Keep ONLY fixed UI elements
+   c. Keep all stable UI elements (no privacy filtering needed — data stays local)
 5. Result: ~20-30 named, fixed UI components per page
 ```
 

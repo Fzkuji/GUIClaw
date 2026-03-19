@@ -2,12 +2,20 @@
 """
 App Visual Memory — per-app component memory with template matching.
 
+Architecture:
+- LEARN on app window crop (focused detection, less noise)
+- MATCH on full screen (no coordinate conversion needed)
+- Templates from window crops match full screen because both use
+  the same screencapture pixel scaling (full screenshot + crop).
+
 Each app gets:
 - profile.json: window structure, known pages, component registry
 - components/: cropped component images (named by content/function)
-- pages/: page-specific layouts with relative coordinates
+- pages/: page-specific layouts
 
-All coordinates are RELATIVE to the window top-left corner.
+Storage policy: only clean up temporary/dynamic content (timestamps,
+chat messages, notification counts) to prevent storage bloat.
+No privacy filtering — data stays local, never uploaded.
 
 Usage:
     # Learn: detect + save all components for an app
@@ -80,9 +88,10 @@ def get_window_bounds(app_name):
 def capture_window(app_name, out_path=None):
     """Capture app window by cropping from full-screen screenshot.
 
-    Always uses full-screen screenshot + crop. This ensures component
-    templates saved during learn() match what match_on_fullscreen() sees.
-    No screencapture -l (which produces different pixel scaling).
+    Used for LEARNING: crops the app window to focus detection on app UI only.
+    Templates saved from this crop will be matched on FULL SCREEN later.
+    This works because full-screen screenshot + crop gives identical pixel
+    scaling to the full-screen screenshot used during matching.
 
     Returns: (img_path, win_x, win_y, win_w, win_h) in logical coords.
     """
@@ -246,16 +255,19 @@ def _is_traffic_light(el, win_w, win_h):
 def should_save_component(el, win_w, win_h):
     """Decide whether to save a detected component.
 
+    Goal: prevent storage bloat by filtering out temporary/dynamic content.
+    We keep all generic UI components (buttons, icons, tabs, nav).
+    We skip things that change every session (timestamps, chat messages, etc.).
+
     Rules for what to save (stable UI):
     - Sidebar elements (left region)
     - Toolbar elements (top region)
     - Header/Footer elements
-    - Elements with OCR text labels
+    - Elements with OCR text labels (UI labels)
 
-    Rules for what to SKIP (dynamic content):
-    - Content area folder/file icons (they change every session)
-    - Tiny icons (< 30x30)
-    - Elements in the main content area without labels
+    Rules for what to SKIP (temporary content that causes storage bloat):
+    - Tiny elements (< 25x25 retina px)
+    - macOS traffic light buttons (system-level, handled separately)
 
     Returns: (should_save, reason)
     """
@@ -484,11 +496,13 @@ def is_duplicate_icon(new_crop, existing_icons_dir, threshold=0.9):
 # Template matching
 # ═══════════════════════════════════════════
 
-def match_component(app_name, component_name, window_img, threshold=0.8):
-    """Match a saved component template against current window.
+def match_component(app_name, component_name, img=None, threshold=0.8):
+    """Match a saved component template against an image (or full screen).
 
-    Returns: (found, rel_x, rel_y, confidence) or (False, 0, 0, 0)
-    Coordinates are relative to window, in logical pixels.
+    If img is None, takes a full screen screenshot automatically.
+    Templates are learned from app window crops but matched on any image.
+    Returns: (found, logical_x, logical_y, confidence) or (False, 0, 0, 0)
+    Coordinates are in logical screen pixels (retina ÷ 2).
     """
     app_dir = get_app_dir(app_name)
     profile = load_profile(app_name)
@@ -505,8 +519,17 @@ def match_component(app_name, component_name, window_img, threshold=0.8):
     if template is None:
         return False, 0, 0, 0
 
+    # If no image provided, take a full screen screenshot
+    if img is None:
+        screen_path = "/tmp/gui_agent_fullscreen.png"
+        subprocess.run(["screencapture", "-x", screen_path],
+                       capture_output=True, timeout=5)
+        img = cv2.imread(screen_path)
+        if img is None:
+            return False, 0, 0, 0
+
     # Convert both to grayscale
-    gray_img = cv2.cvtColor(window_img, cv2.COLOR_BGR2GRAY)
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray_tpl = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
     if (gray_tpl.shape[0] > gray_img.shape[0] or
@@ -518,25 +541,35 @@ def match_component(app_name, component_name, window_img, threshold=0.8):
 
     if max_val >= threshold:
         # Convert to logical pixels (÷2 for retina)
-        rel_x = max_loc[0] // 2 + template.shape[1] // 4
-        rel_y = max_loc[1] // 2 + template.shape[0] // 4
-        return True, rel_x, rel_y, round(max_val, 4)
+        logical_x = max_loc[0] // 2 + template.shape[1] // 4
+        logical_y = max_loc[1] // 2 + template.shape[0] // 4
+        return True, logical_x, logical_y, round(max_val, 4)
 
     return False, 0, 0, 0
 
 
-def match_all_components(app_name, window_img, threshold=0.8):
-    """Match all saved components against current window.
+def match_all_components(app_name, img=None, threshold=0.8):
+    """Match all saved components against an image (or full screen).
 
-    Returns: list of (component_name, rel_x, rel_y, confidence)
+    If img is None, takes a full screen screenshot automatically.
+    Returns: list of (component_name, logical_x, logical_y, confidence)
     """
+    # Take screenshot once, reuse for all components
+    if img is None:
+        screen_path = "/tmp/gui_agent_fullscreen.png"
+        subprocess.run(["screencapture", "-x", screen_path],
+                       capture_output=True, timeout=5)
+        img = cv2.imread(screen_path)
+        if img is None:
+            return []
+
     profile = load_profile(app_name)
     matches = []
 
     for comp_name in profile["components"]:
-        found, rx, ry, conf = match_component(app_name, comp_name, window_img, threshold)
+        found, lx, ly, conf = match_component(app_name, comp_name, img, threshold)
         if found:
-            matches.append((comp_name, rx, ry, conf))
+            matches.append((comp_name, lx, ly, conf))
 
     return matches
 
@@ -766,17 +799,17 @@ def learn_app(app_name, page_name=None):
         print(f"\n{'='*60}")
         print(f"⚠ ACTION REQUIRED: {len(unlabeled)} unlabeled components")
         print(f"{'='*60}")
-        print(f"STEP 1: View images with `image` tool (max 20 per call):")
+        print(f"STEP 1: View images with `image` tool (one at a time for accuracy):")
         print(f"  IMAGES: {json.dumps(unlabeled_paths)}")
         print(f"  NAMES:  {json.dumps(unlabeled_names)}")
         print(f"STEP 2: For each image, identify what it shows.")
         print(f"  - Read any text in the image")
-        print(f"  - Describe the icon/element")
-        print(f"  - ⚠ PRIVACY: If it contains personal info (username, email,")
-        print(f"    avatar, account details), DELETE it instead of renaming")
-        print(f"STEP 3: Rename each component:")
+        print(f"  - Describe the icon/element (e.g., 'search magnifier', 'settings gear')")
+        print(f"  - Only label GENERIC UI components (buttons, icons, tabs, nav elements)")
+        print(f"  - SKIP temporary content (chat messages, notifications, user-specific data)")
+        print(f"STEP 3: Rename each generic component:")
         print(f"  python3 app_memory.py rename --app \"{app_name}\" --old <unlabeled_name> --new <actual_name>")
-        print(f"  Or DELETE private ones:")
+        print(f"  For temp/dynamic content, delete to prevent storage bloat:")
         print(f"  python3 app_memory.py delete --app \"{app_name}\" --component <name>")
         print(f"STEP 4: When task is fully complete, cleanup remaining:")
         print(f"  python3 agent.py cleanup --app \"{app_name}\"")
@@ -919,11 +952,13 @@ def navigate_browser(app_name, url):
 
 
 def auto_cleanup_dynamic(app_name):
-    """Remove dynamic content (timestamps, message previews, etc.) after learning.
+    """Remove temporary/dynamic content after learning to prevent storage bloat.
 
-    RULES (from SKILL.md):
+    RULES:
     - Remove: timestamps, message previews, chat text, stickers, notification counts
-    - Keep: fixed UI elements (buttons, icons, tabs, navigation)
+      (these change every session and would accumulate endlessly)
+    - Keep: all stable UI elements (buttons, icons, tabs, navigation, labels)
+    - No privacy filtering — we don't upload, so no leak risk
     """
     profile = load_profile(app_name)
     app_dir = get_app_dir(app_name)
@@ -1012,19 +1047,19 @@ def auto_cleanup_dynamic(app_name):
 def detect_with_memory(app_name, threshold=0.8):
     """Detect elements, match against memory, report new/known.
     
-    State-aware version: identifies current state and only matches state-specific components.
+    Learn uses app window crop, but matching is done on FULL SCREEN.
+    No coordinate conversion needed — match returns screen logical coords directly.
 
     Returns: (known_matches, unknown_elements, img_path)
     """
     sys.path.insert(0, str(SCRIPT_DIR))
 
+    # Capture window crop for YOLO detection (new element discovery)
     img_path, win_x, win_y, win_w, win_h = capture_window(app_name)
     if not img_path:
         return [], [], None
 
-    img = cv2.imread(img_path)
-    
-    # Get visible text for state identification
+    # Get visible text for state identification (from window crop)
     import ui_detector
     text_elements = ui_detector.detect_text(img_path)
     visible_text = [t.get("label", "") for t in text_elements]
@@ -1033,7 +1068,6 @@ def detect_with_memory(app_name, threshold=0.8):
     current_state, match_ratio = identify_state(app_name, visible_text)
     if current_state:
         print(f"  📊 Identified state: '{current_state}' ({match_ratio:.0%} match)")
-        # Get components for this state only
         state_components = get_state_components(app_name, current_state)
         print(f"  🎯 Matching {len(state_components)} state-specific components")
     else:
@@ -1041,12 +1075,17 @@ def detect_with_memory(app_name, threshold=0.8):
         profile = load_profile(app_name)
         state_components = list(profile.get("components", {}).keys())
 
-    # Match only relevant components
+    # Match on FULL SCREEN — take one screenshot and reuse
+    screen_path = "/tmp/gui_agent_fullscreen.png"
+    subprocess.run(["screencapture", "-x", screen_path],
+                   capture_output=True, timeout=5)
+    screen_img = cv2.imread(screen_path)
+
     known = []
     for comp_name in state_components:
-        found, rx, ry, conf = match_component(app_name, comp_name, img, threshold)
+        found, lx, ly, conf = match_component(app_name, comp_name, screen_img, threshold)
         if found:
-            known.append((comp_name, rx, ry, conf))
+            known.append((comp_name, lx, ly, conf))
     
     print(f"  🔗 Matched {len(known)} known components")
     for name, rx, ry, conf in known:
@@ -1281,16 +1320,13 @@ def main():
         learn_app(args.app, args.page)
 
     elif args.command == "find":
-        img_path, wx, wy, ww, wh = capture_window(args.app)
-        if img_path:
-            img = cv2.imread(img_path)
-            found, rx, ry, conf = match_component(args.app, args.component, img)
-            if found:
-                print(json.dumps({"found": True, "rel_x": rx, "rel_y": ry,
-                                  "screen_x": wx + rx, "screen_y": wy + ry,
-                                  "confidence": conf}))
-            else:
-                print(json.dumps({"found": False, "component": args.component}))
+        # Match on full screen — returns screen logical coords directly
+        found, lx, ly, conf = match_component(args.app, args.component)
+        if found:
+            print(json.dumps({"found": True, "screen_x": lx, "screen_y": ly,
+                              "confidence": conf}))
+        else:
+            print(json.dumps({"found": False, "component": args.component}))
 
     elif args.command == "click":
         ok, msg = click_component(args.app, args.component, verify=not args.no_verify)
