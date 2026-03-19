@@ -5,23 +5,29 @@ description: "Execute GUI actions — click components, type text, send messages
 
 # Act — Execute and Verify
 
-Detection priority: **Template Match on full screen (0.3s) → YOLO (0.3s) → LLM (last resort)**
+## How coordinates work
 
-> **OCR is removed.** Do NOT use OCR coordinates for clicking. Use template matching
-> (saved component images matched on full-screen screenshot) or visual analysis via
-> the `image` tool. OCR text is unreliable for positioning (mixes content from
-> overlapping windows, wrong coordinate systems).
+**ALL click coordinates come from detection — template matching or YOLO.**
+
+| Content type | Detection method | How |
+|---|---|---|
+| Known component (saved template) | Template matching | `click_component` / `match_on_fullscreen` → pixel-precise |
+| Unknown/new UI element | YOLO detection | `agent.py detect` → bounding boxes → click bbox center |
+| Dynamic content (popup, menu) | YOLO or learn new state | Screenshot → detect → if not found, learn → then match |
+
+**`image` tool = understanding only.** Use it to analyze screenshots ("what's on screen?", "which element should I click?", "did the action work?"). NEVER ask it for pixel coordinates.
+
+Detection priority: **Template Match (0.3s) → YOLO (0.3s)**
 
 ## MANDATORY: Screenshot Before AND After Every Click
 
 ```
-1. Screenshot (full screen) → analyze with image tool
-2. Confirm target is visible and correct
-3. Click via template match (app_memory.py click) or calculated position
-4. Screenshot (full screen) → analyze with image tool
-5. Confirm screen changed as expected
-6. If NO change → click failed. Re-analyze, don't repeat blindly.
-7. If WRONG app in front → Esc, re-activate target app, re-analyze.
+1. Screenshot (full screen) → use `image` tool to UNDERSTAND the state
+2. Locate target via template match or YOLO detection (precise coordinates)
+3. Click using detection coordinates
+4. Screenshot (full screen) → use `image` tool to VERIFY the result
+5. If NO change → click failed. Re-detect, don't repeat blindly.
+6. If WRONG app in front → Esc, re-activate target app, re-detect.
 ```
 
 This is NOT optional. Every single click gets a before/after screenshot.

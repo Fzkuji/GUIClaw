@@ -107,12 +107,13 @@ Compare `session_status` from STEP 0 vs now.
 ## Key Principles
 
 1. **Vision-driven, no shortcuts** — every GUI interaction goes through the visual pipeline (screenshot → detect → match → click). Do not use system commands (`open <url>`, `osascript tell app to set URL`, CLI tools) to manipulate app state. Only allowed: `activate` (bring window to front), `screencapture` (take screenshot), `platform_input.py` (click/type via pynput after visual detection provides coordinates). **Screenshot before AND after every click.**
-2. **Two ways to get click coordinates, both visual:**
-   - **Static UI components** (buttons, icons, tabs, nav bars) → **template matching** via `click_component` / `match_on_fullscreen`. Precise, fast, repeatable. Preferred.
-   - **Dynamic content** (chat messages, search results, popups, context menus) → **screenshot + `image` tool analysis**. Crop the relevant region, ask `image` tool for the position within the crop, calculate screen coordinates from crop bounds.
-   Both are vision-driven. Template matching is automated vision; `image` analysis is LLM vision. Neither uses hardcoded coordinates or guessing.
-3. **Static components MUST have saved templates** — if you need to click a button/icon and it has no template → `learn` the app first. Don't use `image` tool to estimate positions of things that should be templates.
-4. **Dynamic content workflow**: screenshot → crop region of interest → `image` tool to locate target within crop → calculate: `screen_x = (crop_x_start + target_x_in_crop) / 2`, `screen_y = (crop_y_start + target_y_in_crop) / 2` (physical→logical). Always verify with screenshot after clicking.
+2. **Coordinates come from detection, NEVER from guessing:**
+   - **Known components** → template matching (`click_component` / `match_on_fullscreen`). Pixel-precise (conf≈1.0).
+   - **Unknown/dynamic content** (new popup, menu, search results) → screenshot → YOLO detection → get precise bounding boxes → click center of bbox.
+   - If detection misses the target → `learn` the current state to save new components, then template match.
+   - **`image` tool role = understanding, NOT positioning.** Use it to answer "what is this?", "which item should I click?", "did the screen change?". NEVER ask it for pixel coordinates.
+3. **Every clickable target must have a detection-based coordinate** — either from template matching (saved component) or from YOLO detection (fresh screenshot). No exceptions. If you can't detect it, learn it first.
+4. **Dynamic content workflow**: screenshot → YOLO detect all elements → identify which element to click (by label or `image` tool for understanding) → use the YOLO bbox center as click coordinate. If YOLO doesn't find it → learn the new state → template match.
 5. **Paste > Type** for CJK text and special chars
 6. **Learn incrementally** — save new components after each interaction
 7. **Integer coordinates only** — pynput uses logical screen coordinates (integers)
@@ -126,7 +127,7 @@ These exist because of real bugs:
 2. **Every click gets before/after screenshots** — `click_component` does this automatically; manual clicks must do it explicitly
 3. **No wrong-app learning** — validate frontmost app before learn
 4. **Reject tiny templates** — <30×30 pixels produce false matches
-5. **Vision model provides coordinates only for dynamic content** — for static UI elements, use template matching. Vision model (via `image` tool + crop) is valid for dynamic content that has no saved template.
+5. **`image` tool = understanding only** — use it to analyze what's on screen, identify targets by name/meaning, verify actions. NEVER use it to get click coordinates. Coordinates come from template matching or YOLO detection only.
 6. **Never send screenshots to conversation** — internal detection only
 7. **If click has no effect** — screenshot, analyze what happened, don't repeat blindly. Possible causes: wrong app in front, window moved, click outside window, element not interactive.
 
