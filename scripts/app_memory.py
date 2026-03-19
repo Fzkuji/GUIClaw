@@ -1460,31 +1460,9 @@ def click_component(app_name, component_name, verify=True):
     if not appeared and not disappeared:
         print(f"  ⚠️ No component changes detected after click")
 
-    # 8. State verification / learning
-    if expected_state:
-        # VERIFY: check if expected components appeared
-        expected_visible = set(expected_state.get("visible", []))
-        expected_appeared = set(expected_state.get("appeared", []))
-        
-        if expected_appeared:
-            matched = expected_appeared & appeared
-            match_ratio = len(matched) / len(expected_appeared) if expected_appeared else 0
-            if match_ratio >= 0.5:
-                print(f"  ✅ State verified: {len(matched)}/{len(expected_appeared)} expected components appeared ({match_ratio:.0%})")
-            else:
-                print(f"  ⚠️ State mismatch: only {len(matched)}/{len(expected_appeared)} expected components ({match_ratio:.0%})")
-                print(f"    Expected: {', '.join(sorted(expected_appeared))}")
-                print(f"    Got: {', '.join(sorted(appeared)) if appeared else '(none)'}")
-        else:
-            # Legacy state without 'appeared' field — just check visible
-            overlap = len(after_visible & expected_visible)
-            ratio = overlap / len(expected_visible) if expected_visible else 0
-            if ratio >= 0.5:
-                print(f"  ✅ State verified: {overlap}/{len(expected_visible)} expected components visible ({ratio:.0%})")
-            else:
-                print(f"  ⚠️ State mismatch: {overlap}/{len(expected_visible)} visible ({ratio:.0%})")
-    else:
-        # LEARN: save this click's resulting state for future verification
+    # 8. State verification / learning / updating
+    def _save_click_state():
+        """Save or update state data for this click."""
         save_state(
             app_name, state_name,
             visible_texts=list(after_visible),
@@ -1492,16 +1470,37 @@ def click_component(app_name, component_name, verify=True):
             trigger_pos=[screen_x, screen_y],
             disappeared=list(disappeared),
         )
-        # Also save the 'appeared' set for precise verification
-        profile = load_profile(app_name)
-        if state_name in profile.get("states", {}):
-            profile["states"][state_name]["appeared"] = list(appeared)
-            save_profile(app_name, profile)
+        profile_tmp = load_profile(app_name)
+        if state_name in profile_tmp.get("states", {}):
+            profile_tmp["states"][state_name]["appeared"] = list(appeared)
+            save_profile(app_name, profile_tmp)
+
+    if expected_state:
+        # VERIFY: check expected components
+        expected_appeared = set(expected_state.get("appeared", []))
+        expected_visible = set(expected_state.get("visible", []))
         
-        if appeared:
-            print(f"  💾 Saved state '{state_name}': {len(appeared)} new components as verification targets")
+        if expected_appeared:
+            matched = expected_appeared & appeared
+            match_ratio = len(matched) / len(expected_appeared) if expected_appeared else 0
         else:
-            print(f"  💾 Saved state '{state_name}' (no new components detected)")
+            overlap = len(after_visible & expected_visible)
+            match_ratio = overlap / len(expected_visible) if expected_visible else 0
+
+        if match_ratio >= 0.5:
+            print(f"  ✅ State verified ({match_ratio:.0%})")
+        else:
+            # Mismatch — update state with current data
+            print(f"  ⚠️ State mismatch ({match_ratio:.0%}), updating state data...")
+            _save_click_state()
+            print(f"  🔄 State '{state_name}' updated with current components")
+    else:
+        # LEARN: new state
+        _save_click_state()
+        if appeared:
+            print(f"  💾 Saved state '{state_name}': {len(appeared)} new components")
+        else:
+            print(f"  💾 Saved state '{state_name}'")
 
     # 9. Record state transition (from_state --click--> to_state)
     #    Use the state saved for this click as to_state (click:{component})
