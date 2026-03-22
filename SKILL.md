@@ -11,34 +11,19 @@ You ARE the agent loop. Every GUI task follows this flow:
 OBSERVE → ENSURE APP READY → ACT → VERIFY (auto) → RECORD TRANSITION → REPORT
 ```
 
-## Sub-Skills (MANDATORY — read ALL before first GUI action)
+## Sub-Skills
 
-**Before doing ANY GUI operation, you MUST `read` these files. No exceptions. They are short (~100 lines each).**
+Each step in the execution flow below has a corresponding sub-skill file. **When you reach that step, you MUST `read` the sub-skill file first.** This is not optional — the sub-skill contains the exact procedure and rules for that step.
 
-```
-read skills/gui-observe/SKILL.md   # How to screenshot and detect state
-read skills/gui-learn/SKILL.md     # How to learn new app UIs
-read skills/gui-act/SKILL.md       # How to click, type, send messages
-read skills/gui-memory/SKILL.md    # How to save/load components and states
-```
-
-**Read these when needed:**
-
-```
-read skills/gui-workflow/SKILL.md  # State graph navigation (multi-step tasks)
-read skills/gui-setup/SKILL.md    # First-time setup on new machine
-read skills/gui-report/SKILL.md   # Performance tracking
-```
-
-| Step | Skill | Mandatory? |
-|------|-------|-----------|
-| **Observe** | `skills/gui-observe/SKILL.md` | ✅ Always read first |
-| **Learn** | `skills/gui-learn/SKILL.md` | ✅ Always read first |
-| **Act** | `skills/gui-act/SKILL.md` | ✅ Always read first |
-| **Memory** | `skills/gui-memory/SKILL.md` | ✅ Always read first |
-| **Workflow** | `skills/gui-workflow/SKILL.md` | When doing multi-step navigation |
-| **Setup** | `skills/gui-setup/SKILL.md` | First-time setup only |
-| **Report** | `skills/gui-report/SKILL.md` | When tracking performance |
+| Step | Sub-Skill | Read when |
+|------|-----------|-----------|
+| **Observe** | `read {baseDir}/skills/gui-observe/SKILL.md` | MUST read before taking any screenshot or detecting state |
+| **Learn** | `read {baseDir}/skills/gui-learn/SKILL.md` | MUST read before learning a new app or re-learning components |
+| **Act** | `read {baseDir}/skills/gui-act/SKILL.md` | MUST read before any click, type, or input action |
+| **Memory** | `read {baseDir}/skills/gui-memory/SKILL.md` | MUST read before saving/loading components or states |
+| **Workflow** | `read {baseDir}/skills/gui-workflow/SKILL.md` | MUST read before multi-step navigation or state graph operations |
+| **Setup** | `read {baseDir}/skills/gui-setup/SKILL.md` | MUST read before first-time setup on a new machine |
+| **Report** | `read {baseDir}/skills/gui-report/SKILL.md` | MUST read before tracking or reporting task performance |
 
 ## Core Commands
 
@@ -69,46 +54,34 @@ python3 scripts/agent.py send_message --app WeChat --contact "小明" --message 
 ## Execution Flow
 
 ### STEP 0: OBSERVE
-Take screenshot. Use `image` tool to **understand** current state (what app, what page, what's visible). First time only — subsequent steps use component detection.
+→ **MUST `read {baseDir}/skills/gui-observe/SKILL.md` first**
+
+Take screenshot. Run GPA-GUI-Detector + OCR to detect all UI elements. Use `image` tool only to **understand** the scene (not for coordinates).
 
 ### STEP 1: ENSURE APP READY
-If app not in memory → `learn`. If component not found → `learn` current state.
-Component not matching ≠ lower threshold. It means the component isn't on screen — re-learn to discover what IS on screen.
+→ **MUST `read {baseDir}/skills/gui-learn/SKILL.md` first** (if learning needed)
+
+If app not in memory → learn. If component not found → re-learn current state.
 
 ### STEP 2: ACT
-`click_component` handles everything automatically:
-1. Screenshot (one, shared for detection + matching)
-2. Detect visible components (template match, no LLM)
-3. Match target component → get precise coordinates
-4. Click
-5. Detect visible components again
-6. Record state transition (from → click → to)
-7. Report: appeared/disappeared components, current state
+→ **MUST `read {baseDir}/skills/gui-act/SKILL.md` first**
 
-### STEP 3: VERIFY (automatic)
-- **Known state**: verifies expected components appeared (no screenshot needed)
-- **Mismatch**: agent should then screenshot + `image` tool to diagnose
+Click/type/interact using coordinates from detection results only. Never guess coordinates.
 
-### STEP 4: STATE TRANSITION (pending)
-Every click records a **pending** transition. Pending = NOT saved yet.
-- **Workflow succeeds** → `confirm_transitions(app)` → saved permanently
-- **Workflow fails/aborts** → `discard_transitions(app)` → thrown away
-- This prevents trial-and-error clicks from polluting the state graph
+### STEP 3: SAVE TO MEMORY
+→ **MUST `read {baseDir}/skills/gui-memory/SKILL.md` first**
 
-### STEP 5: COMMIT OR DISCARD
-After the full workflow completes:
-- **Success** → `confirm_transitions(app)` + `save_workflow(app, name, target_state)`
-- **Failure** → `discard_transitions(app)` — graph stays clean
+Save detection results, components, and state to `memory/apps/<appname>/`. Every operation must update memory.
 
-### STEP 6: REPORT
+### STEP 4: STATE TRANSITION
+→ **MUST `read {baseDir}/skills/gui-workflow/SKILL.md` first** (for multi-step tasks)
 
-Use `gui-report` skill's tracker:
+Every click records a pending transition. Workflow succeeds → confirm. Fails → discard.
 
-1. **Task start**: `session_status` → note context size → `tracker.py start --task "..." --context X`
-2. **During task**: clicks/screenshots/learns auto-tick via `app_memory.py`. Only `image_calls` needs manual tick.
-3. **Task end**: `session_status` → `tracker.py report --context X`
+### STEP 5: REPORT
+→ **MUST `read {baseDir}/skills/gui-report/SKILL.md` first**
 
-Outputs duration, context delta, and operation counts. Use `tracker.py history` to review past tasks.
+Track task performance: duration, token usage, operation counts.
 
 ---
 
