@@ -62,11 +62,11 @@ GUIClaw runs on the following stack:
 | Metric | Value |
 |--------|-------|
 | Tasks tested | 22 / 46 |
-| Tasks passed | **18** |
-| Tasks failed | 4 (infrastructure issues) |
-| **Pass rate** | **81.8%** (18/22) |
+| Tasks passed | **19** |
+| Tasks failed | 3 (infrastructure issues) |
+| **Pass rate** | **86.4%** (19/22) |
 
-> 18 tasks completed successfully: 15 feasible tasks scored 1.0, and 3 infeasible tasks were correctly identified as impossible. 4 tasks failed due to Linux Chromium missing features that exist in standard Chrome (not agent capability issues).
+> 19 tasks completed successfully: 16 feasible tasks scored 1.0, and 3 infeasible tasks correctly identified. 3 tasks failed due to Linux Chromium missing features (not agent capability issues).
 
 ### Detailed Results
 
@@ -86,7 +86,7 @@ GUIClaw runs on the following stack:
 | 11 | `99146c54` | Auto-clear data on close | 0 | ❌ | Chromium 138 on Linux doesn't expose this setting |
 | 12 | `12086550` | Navigate to password manager | 1.0 | ✅ | URL navigation: chrome://password-manager/passwords |
 | 13 | `6766f2b8` | Load unpacked Chrome extension | 1.0 | ✅ | Extensions → Developer mode → Load unpacked → select folder |
-| 14 | `93eabf48` | Turn off dark mode | 0 | ❌ | Linux Chromium has no Light/Dark mode selector in UI |
+| 14 | `93eabf48` | Turn off dark mode | 1.0 | ✅ | Settings → Appearance → "Use Classic" resets dark mode to light |
 | 15 | `ae78f875` | Change search results per page to 50 | — | ✅ | Infeasible: this is a Google Search preference, not a Chrome setting |
 | 16 | `3299584d` | Remove startup page | 1.0 | ✅ | Settings → On startup → "Open the New Tab page" |
 | 17 | `030eeff7` | Enable Do Not Track | 1.0 | ✅ | Settings → Cookies → toggle DNT → Confirm |
@@ -97,10 +97,9 @@ GUIClaw runs on the following stack:
 
 | # | Issue |
 |---|-------|
-| 11 | Chromium 138 on Linux doesn't have "Clear on close" setting |
-| 14 | Linux Chromium has no Light/Dark mode selector (only GTK/Classic/QT theme) |
+| 11 | Chromium 138 on Linux doesn't have "Clear cookies on close" setting (confirmed: `chrome://settings/cookies` has no such toggle) |
 
-These 2 tasks failed because the target Chrome feature doesn't exist in this Chromium build on Linux — not because the agent couldn't operate the UI. Tasks 17 and 18 (previously failed due to network proxy interference) were re-tested successfully after fixing the proxy configuration.
+This task failed because the target Chrome feature doesn't exist in Chromium 138 on Linux — not because the agent couldn't operate the UI.
 
 ### Not Yet Tested
 
@@ -114,7 +113,7 @@ Reference scores from the [OSWorld leaderboard](https://os-world.github.io/) (Ch
 |------|-------|--------|---------|------|
 | 1 | HIPPO Agent w/Opus 4.5 (Lenovo) | 60.4% (25.96/43) | 74.5% | Agentic framework |
 | 2 | Claude Sonnet 4.6 (Anthropic) | 78.5% (32.96/42) | 72.1% | General model |
-| — | **GUIClaw** | **81.8%** (18/22 tested) | TBD | OpenClaw + Claude Opus 4.6 |
+| — | **GUIClaw** | **86.4%** (19/22 tested) | TBD | OpenClaw + Claude Opus 4.6 |
 
 > ⚠️ GUIClaw's score is on a partial Chrome subset (22/46 tasks). Full benchmark in progress. Not directly comparable to full-set results yet, but early numbers are promising.
 
