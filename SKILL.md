@@ -11,17 +11,34 @@ You ARE the agent loop. Every GUI task follows this flow:
 OBSERVE → ENSURE APP READY → ACT → VERIFY (auto) → RECORD TRANSITION → REPORT
 ```
 
-## Sub-Skills (read on demand)
+## Sub-Skills (MANDATORY — read ALL before first GUI action)
 
-| Step | Skill | When to read |
-|------|-------|-------------|
-| **Observe** | `skills/gui-observe/SKILL.md` | Before any action — screenshot, detect state |
-| **Learn** | `skills/gui-learn/SKILL.md` | App not in memory, or component not found |
-| **Act** | `skills/gui-act/SKILL.md` | Clicking, typing, sending messages |
-| **Memory** | `skills/gui-memory/SKILL.md` | Profiles, components, states, transitions |
-| **Workflow** | `skills/gui-workflow/SKILL.md` | State graph navigation, workflow replay |
-| **Setup** | `skills/gui-setup/SKILL.md` | First-time setup on a new machine |
-| **Report** | `skills/gui-report/SKILL.md` | Task performance tracking — start/tick/report |
+**Before doing ANY GUI operation, you MUST `read` these files. No exceptions. They are short (~100 lines each).**
+
+```
+read skills/gui-observe/SKILL.md   # How to screenshot and detect state
+read skills/gui-learn/SKILL.md     # How to learn new app UIs
+read skills/gui-act/SKILL.md       # How to click, type, send messages
+read skills/gui-memory/SKILL.md    # How to save/load components and states
+```
+
+**Read these when needed:**
+
+```
+read skills/gui-workflow/SKILL.md  # State graph navigation (multi-step tasks)
+read skills/gui-setup/SKILL.md    # First-time setup on new machine
+read skills/gui-report/SKILL.md   # Performance tracking
+```
+
+| Step | Skill | Mandatory? |
+|------|-------|-----------|
+| **Observe** | `skills/gui-observe/SKILL.md` | ✅ Always read first |
+| **Learn** | `skills/gui-learn/SKILL.md` | ✅ Always read first |
+| **Act** | `skills/gui-act/SKILL.md` | ✅ Always read first |
+| **Memory** | `skills/gui-memory/SKILL.md` | ✅ Always read first |
+| **Workflow** | `skills/gui-workflow/SKILL.md` | When doing multi-step navigation |
+| **Setup** | `skills/gui-setup/SKILL.md` | First-time setup only |
+| **Report** | `skills/gui-report/SKILL.md` | When tracking performance |
 
 ## Core Commands
 
