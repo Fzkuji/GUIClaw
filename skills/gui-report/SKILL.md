@@ -10,8 +10,7 @@ Track every GUI task: time, tokens, and operations.
 ## When to Use
 
 - **BEFORE** any gui-agent task: call `start`
-- **DURING** the task: call `tick` after each screenshot/click/learn/detect/image call
-- **AFTER** the task completes: call `report` with final token counts
+- **AFTER** the task completes: call `report`
 - **On demand**: call `history` to review past tasks
 
 ## Commands
@@ -19,50 +18,53 @@ Track every GUI task: time, tokens, and operations.
 ```bash
 TRACKER="python3 ~/.openclaw/workspace/skills/gui-agent/skills/gui-report/scripts/tracker.py"
 
-# 1. Start tracking (get context size from session_status, e.g. "Context: 94k" → 94000)
-$TRACKER start --task "CleanMyMac cleanup" --context 94000
+# 1. Start tracking (token baseline read automatically from sessions.json)
+$TRACKER start --task "OSWorld Task 25: United Airlines baggage calculator"
 
-# 2. During task — clicks/screenshots/learns auto-tick via app_memory.py
+# 2. During task — most counters auto-tick:
+#    - learn_from_screenshot() → screenshots, learns, ocr_calls, detector_calls
+#    - record_page_transition() → transitions, clicks, ocr_calls
 #    Only image_calls needs manual tick:
 $TRACKER tick image_calls
-#    Optional manual tick for anything else:
-$TRACKER tick clicks -n 3    # batch increment
 
-# 3. Optional notes
-$TRACKER note "Clicked Ignore on quit dialog"
+# 3. Final report (tokens read automatically — no --context needed)
+$TRACKER report
 
-# 4. Final report (get context size again from session_status)
-$TRACKER report --context 100000
-
-# 5. View history
+# 4. View history
 $TRACKER history
 ```
 
-## Context Baseline
+## What's Automatic
 
-Get context size from `session_status` tool (the `Context: XXk/1.0m` line):
-- **Before task**: record context size → `tracker start --context XXX`
-- **After task**: record again → `tracker report --context XXX`
-- Tracker computes the delta = how much context this task consumed
+| Counter | Auto-ticked by | Manual? |
+|---------|---------------|---------|
+| screenshots | `learn_from_screenshot()` | No |
+| learns | `learn_from_screenshot()` | No |
+| ocr_calls | `learn_from_screenshot()`, `record_page_transition()` | No |
+| detector_calls | `learn_from_screenshot()` | No |
+| transitions | `record_page_transition()` | No |
+| clicks | `record_page_transition()` | No |
+| image_calls | — | **Yes** (`$TRACKER tick image_calls`) |
+
+## Token Tracking
+
+Reads directly from `~/.openclaw/agents/main/sessions/sessions.json`.
+No manual context size input needed — `start` records baseline, `report` reads current, computes delta.
 
 ## Output Example
 
 ```
 ============================================================
-📊 GUI Task Report: CleanMyMac cleanup
+📊 GUI Task Report: OSWorld Task 25
 ============================================================
-⏱  Duration:    4.4min
-📦 Context:     94.0k → 100.0k (+6.0k)
-🔧 Operations:  3×screenshots, 5×clicks, 3×image_calls
+⏱  Duration:    4.2min
+🪙 Tokens:      168.4k → 195.2k (+26.8k)
+   Input:       +3.2k
+   Output:      +1.8k
+   Cache read:  +21.8k
+🔧 Operations:  5×screenshots, 4×clicks, 4×learns, 3×transitions, 8×ocr_calls, 4×detector_calls, 2×image_calls
 ============================================================
 ```
-
-## Integration with gui-agent
-
-In SKILL.md STEP 6 (Report):
-1. `session_status` at task start → `tracker.py start`
-2. `tick` inline with each operation
-3. `session_status` at task end → `tracker.py report`
 
 ## Log Storage
 
