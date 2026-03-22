@@ -11,7 +11,6 @@
 | Feature | GUIClaw | Typical OSWorld Agents |
 |---------|---------|----------------------|
 | Vision backbone | Local YOLO (GPA-GUI-Detector) + OCR | GPT-4V / Claude Vision API |
-| Cost per task | ~$0 (local inference) | $0.50–$2.00 per task |
 | UI element detection | Template matching + YOLO bboxes | Screenshot → VLM prompt |
 | Action execution | Direct pyautogui coordinates | Coordinate extraction from VLM |
 | Requires fine-tuning | No | Often yes |
