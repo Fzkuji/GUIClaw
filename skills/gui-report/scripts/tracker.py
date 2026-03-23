@@ -82,25 +82,36 @@ def _read_tokens(session_key=None):
     }
 
 
+# All known counters (for start() initialization and reporting)
+COUNTERS = [
+    "screenshots", "clicks", "learns", "transitions",
+    "image_calls", "ocr_calls", "detector_calls",
+    # Workflow verification counters
+    "workflow_level0",        # quick_template_check verifications
+    "workflow_level1",        # detect_all full verifications
+    "workflow_level2",        # fallback to LLM
+    "workflow_auto_steps",    # steps executed in auto mode
+    "workflow_explore_steps", # steps executed in explore mode
+]
+
+
 def start(args):
     """Record baseline before a GUI task."""
-    tokens = _read_tokens(args.session)
+    session = args.session if hasattr(args, 'session') else None
+    task = args.task if hasattr(args, 'task') else None
+    tokens = _read_tokens(session)
 
     state = {
-        "task": args.task or "unnamed",
+        "task": task or "unnamed",
         "start_time": time.time(),
         "session_key": tokens["sessionKey"] if tokens else None,
         "tokens_start": tokens,
-        # Counters (auto-incremented by app_memory.py functions)
-        "screenshots": 0,
-        "clicks": 0,
-        "learns": 0,          # learn_from_screenshot calls
-        "transitions": 0,     # record_page_transition calls
-        "image_calls": 0,     # LLM image tool calls (manual tick)
-        "ocr_calls": 0,       # detect_text calls
-        "detector_calls": 0,  # detect_icons calls
         "notes": [],
     }
+    # Initialize all counters to 0
+    for c in COUNTERS:
+        state[c] = 0
+
     with open(STATE_FILE, "w") as f:
         json.dump(state, f)
 
@@ -140,6 +151,81 @@ def tick_counter(counter, n=1):
             json.dump(state, f)
     except Exception:
         pass
+
+
+def update_task_name(name):
+    """Update the task name in running tracker state.
+
+    Called by learn_from_screenshot with app_name + domain.
+    Only updates if current name is 'auto' (don't overwrite explicit names).
+    """
+    if not STATE_FILE.exists():
+        return
+    try:
+        with open(STATE_FILE) as f:
+            state = json.load(f)
+        # Only update if auto-started (don't overwrite explicit task names)
+        if state.get("task") in ("auto", "unnamed"):
+            state["task"] = name
+            with open(STATE_FILE, "w") as f:
+                json.dump(state, f)
+    except Exception:
+        pass
+
+
+def auto_report():
+    """Generate report and return formatted string (don't print).
+
+    Differences from report():
+    - Returns string instead of printing
+    - Does NOT delete state file (tracker continues running)
+    - Does NOT save to log (wait for formal report() to save)
+    """
+    if not STATE_FILE.exists():
+        return "⚠ No active tracker."
+
+    try:
+        with open(STATE_FILE) as f:
+            state = json.load(f)
+
+        elapsed = time.time() - state["start_time"]
+        tokens_now = _read_tokens(state.get("session_key"))
+        tokens_start = state.get("tokens_start", {})
+
+        total_start = tokens_start.get("totalTokens", 0) if tokens_start else 0
+        total_end = tokens_now.get("totalTokens", 0) if tokens_now else 0
+        token_delta = total_end - total_start
+
+        input_start = tokens_start.get("inputTokens", 0) if tokens_start else 0
+        input_end = tokens_now.get("inputTokens", 0) if tokens_now else 0
+        output_start = tokens_start.get("outputTokens", 0) if tokens_start else 0
+        output_end = tokens_now.get("outputTokens", 0) if tokens_now else 0
+        cache_start = tokens_start.get("cacheRead", 0) if tokens_start else 0
+        cache_end = tokens_now.get("cacheRead", 0) if tokens_now else 0
+
+        # Format time
+        if elapsed < 60:
+            time_str = f"{elapsed:.1f}s"
+        elif elapsed < 3600:
+            time_str = f"{elapsed/60:.1f}min"
+        else:
+            time_str = f"{elapsed/3600:.1f}h"
+
+        # Operations
+        ops = []
+        for key in COUNTERS:
+            v = state.get(key, 0)
+            if v > 0:
+                ops.append(f"{v}×{key}")
+
+        lines = []
+        lines.append(f"📊 {state['task']} | ⏱ {time_str} | 🪙 +{_fmt(token_delta)} tokens")
+        if ops:
+            lines.append(f"   🔧 {', '.join(ops)}")
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"⚠ auto_report failed: {e}"
 
 
 def note(args):
@@ -192,7 +278,7 @@ def report(args):
 
     # Operations
     ops = []
-    for key in ["screenshots", "clicks", "learns", "transitions", "ocr_calls", "detector_calls", "image_calls"]:
+    for key in COUNTERS:
         v = state.get(key, 0)
         if v > 0:
             ops.append(f"{v}×{key}")
@@ -224,9 +310,7 @@ def report(args):
         "input_delta": input_end - input_start,
         "output_delta": output_end - output_start,
         "cache_read_delta": cache_delta,
-        "operations": {k: state.get(k, 0) for k in
-                       ["screenshots", "clicks", "learns", "transitions",
-                        "ocr_calls", "detector_calls", "image_calls"]},
+        "operations": {k: state.get(k, 0) for k in COUNTERS},
         "notes": state.get("notes", []),
     }
     with open(LOG_FILE, "a") as f:
@@ -282,8 +366,7 @@ def main():
     p_start.add_argument("--session", help="OpenClaw session key (auto-detected if omitted)")
 
     p_tick = sub.add_parser("tick", help="Increment a counter")
-    p_tick.add_argument("counter", choices=["screenshots", "clicks", "learns", "transitions",
-                                            "ocr_calls", "detector_calls", "image_calls"])
+    p_tick.add_argument("counter", choices=COUNTERS)
     p_tick.add_argument("-n", type=int, default=1)
 
     p_note = sub.add_parser("note", help="Add a note")

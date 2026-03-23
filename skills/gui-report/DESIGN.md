@@ -11,17 +11,35 @@
 
 ## 当前状态
 
-⚠️ **gui-report 目前未被正式使用过。** auto-tick 机制在后台计数（screenshots、ocr_calls 等），但 `start` 和 `report` 从未在实际任务中正式调用。没有历史数据，没有 data 目录。
+✅ **完全自动化**。tracker 在第一次 `detect_all` / `learn_from_screenshot` 时自动启动，所有计数器自动 tick，task 名自动从 app/domain 推断。
 
-## 设计
+## 自动化设计决策
 
-### auto-tick 机制
+### 为什么自动化？
 
-各函数内部自动计数，不需要 LLM 手动调用：
-- `learn_from_screenshot()` → screenshots++, learns++, ocr_calls++, detector_calls++
-- `record_page_transition()` → transitions++, clicks++, ocr_calls++, detector_calls++
+之前 `start` 和 `report` 需要手动调用，实际上从未被使用过。自动化消除了这个问题：
+- tracker 在 `_tracker_auto_tick()` 检测到无 state file 时自动启动
+- task 名从 `learn_from_screenshot` 的 `app_name/domain` 自动推断
+- `execute_workflow()` 完成时自动打印 `auto_report()` 摘要
+- 正式 `report` 命令仍可用于生成完整报告并保存到日志
 
-只有 `image_calls`（LLM 看截图的次数）需要手动 tick，因为 image tool 的调用在 LLM 层面，不在 app_memory.py 里。
+### auto-tick 集成点
+
+#### app_memory.py
+- `_tracker_auto_tick(counter)`: 所有检测/学习函数调用此函数
+- `_tracker_auto_start()`: 自动初始化 tracker state (task="auto")
+- `_tracker_update_task(name)`: `learn_from_screenshot` 自动更新 task 名
+- `quick_template_check()`: 自动 tick `workflow_level0`
+
+#### agent.py
+- `_tick(counter)`: 封装 tracker 调用（best-effort）
+- `_auto_report()`: 获取摘要字符串
+- `execute_workflow()` 内部：
+  - Level 0 成功 → tick `workflow_auto_steps`
+  - Level 1 检测后 → tick `workflow_level1`
+  - Level 1 成功 → tick `workflow_auto_steps`
+  - Level 2 fallback → tick `workflow_level2` + `workflow_explore_steps`
+  - 完成时打印 `auto_report()` 摘要
 
 ### 计数器
 
@@ -34,25 +52,40 @@
 | ocr_calls | ✅ | OCR 调用次数 |
 | detector_calls | ✅ | GPA-GUI-Detector 调用次数 |
 | image_calls | ❌ 手动 | LLM 视觉分析次数 |
+| workflow_level0 | ✅ | quick_template_check 验证次数 |
+| workflow_level1 | ✅ | detect_all 完整验证次数 |
+| workflow_level2 | ✅ | fallback to LLM 次数 |
+| workflow_auto_steps | ✅ | 自动模式执行的步数 |
+| workflow_explore_steps | ✅ | 探索模式（需要 LLM）的步数 |
 
 ### Token 追踪
 
 通过读取 OpenClaw 的 sessions.json 获取任务开始和结束时的 token 数，计算差值。
 
-### 待解决问题
+### auto_report() vs report()
 
-1. **从未正式调用**：需要在主 SKILL.md 的流程中强制要求 start/report
-2. **没有持久化数据目录**：需要创建 data/ 目录存储历史报告
-3. **和 workflow 的分层验证整合**：Level 0/1/2 的调用次数也应该追踪
-4. **Benchmark 模式**：OSWorld 等 benchmark 应该自动产出 per-task 报告
+| | auto_report() | report() |
+|---|---|---|
+| 输出 | 返回字符串 | print 到 stdout |
+| state file | 不删除（继续运行） | 删除（tracker 结束）|
+| 日志 | 不保存 | 保存到 task_history.jsonl |
+| 用途 | workflow 中间摘要 | 任务最终报告 |
+
+### 安全性
+
+- 所有 tracker 操作都在 try/except 里，失败静默忽略
+- tick_counter 的 JSON 读写用 try/except 保护（不会因并发破坏主流程）
+- tracker 是 best-effort — 任何错误不影响 GUI 操作
 
 ## 理想流程
 
 ```
-任务开始 → tracker start
+第一次 detect_all → tracker 自动启动 (task="auto")
+learn_from_screenshot → 更新 task 名为 "app_name/domain"
   → 操作中各计数器自动 tick
-  → 包括 workflow 的 level 0/1/2 验证次数
-任务结束 → tracker report
-  → 输出：时间、token 消耗、操作次数、成功率
-  → 保存到 data/<timestamp>.json
+  → execute_workflow 完成时打印 auto_report
+任务结束 → tracker report（可选）
+  → 输出完整报告
+  → 保存到 logs/task_history.jsonl
+  → 清除 state file
 ```

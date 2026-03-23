@@ -32,6 +32,29 @@ MEMORY_DIR = SKILL_DIR / "memory" / "apps"
 
 BROWSER_APPS = {"Google Chrome", "Safari", "Firefox", "Arc", "Microsoft Edge", "Brave Browser"}
 
+# Tracker integration — auto-tick workflow counters
+def _tick(counter, n=1):
+    """Tick a tracker counter. Best-effort, never fails."""
+    try:
+        tracker_scripts = str(SKILL_DIR / "skills" / "gui-report" / "scripts")
+        if tracker_scripts not in sys.path:
+            sys.path.insert(0, tracker_scripts)
+        from tracker import tick_counter
+        tick_counter(counter, n)
+    except Exception:
+        pass
+
+def _auto_report():
+    """Get auto-report summary string. Best-effort."""
+    try:
+        tracker_scripts = str(SKILL_DIR / "skills" / "gui-report" / "scripts")
+        if tracker_scripts not in sys.path:
+            sys.path.insert(0, tracker_scripts)
+        from tracker import auto_report
+        return auto_report()
+    except Exception:
+        return ""
+
 # Session tracker — logs every action for final report
 SESSION_LOG = SKILL_DIR / "memory" / ".session_log.json"
 
@@ -683,8 +706,13 @@ def execute_workflow(app_name, target_state, domain=None, img_path=None):
                 if l0_img is not None:
                     matched, total, ratio = quick_template_check(
                         app_dir, target_defining, img=l0_img)
+                    # quick_template_check auto-ticks workflow_level0
                     if ratio > 0.7:
                         print(f"  ✅ Level 0: Target state confirmed ({len(matched)}/{total} = {ratio:.0%})")
+                        _tick("workflow_auto_steps")
+                        summary = _auto_report()
+                        if summary:
+                            print(f"\n{summary}")
                         return ("success", target_state)
 
         # --- Level 1: Full detect_all + identify_current_state ---
@@ -725,13 +753,19 @@ def execute_workflow(app_name, target_state, domain=None, img_path=None):
                 continue
 
         new_state_id, new_jaccard = identify_current_state(states, l1_detected, components_data)
+        _tick("workflow_level1")
 
         if new_state_id == expected_next_state:
             print(f"  ✅ Level 1: Reached expected state '{expected_next_state}' (jaccard={new_jaccard:.2f})")
+            _tick("workflow_auto_steps")
             current_state_id = new_state_id
             continue
         elif new_state_id == target_state:
             print(f"  ✅ Level 1: Already at target '{target_state}' (jaccard={new_jaccard:.2f})")
+            _tick("workflow_auto_steps")
+            summary = _auto_report()
+            if summary:
+                print(f"\n{summary}")
             return ("success", target_state)
         elif new_state_id and new_state_id != current_state_id:
             # Landed on a different known state — try to re-route
@@ -748,6 +782,8 @@ def execute_workflow(app_name, target_state, domain=None, img_path=None):
                 return ("fallback", new_state_id, i, f"Re-route failed: no path from '{new_state_id}' to '{target_state}'")
         else:
             # --- Level 2: Unknown state, return for LLM ---
+            _tick("workflow_level2")
+            _tick("workflow_explore_steps")
             return ("fallback", new_state_id, i,
                     f"Unknown state after step {i+1} (detected {len(l1_detected)} components, jaccard={new_jaccard:.2f})")
 
@@ -760,10 +796,15 @@ def execute_workflow(app_name, target_state, domain=None, img_path=None):
         final_img = cv2.imread(screen_path_final)
         if final_img is not None:
             matched, total, ratio = quick_template_check(app_dir, target_defining, img=final_img)
+            # quick_template_check auto-ticks workflow_level0
             if ratio > 0.7:
                 print(f"  ✅ Final check: Target state confirmed ({len(matched)}/{total} = {ratio:.0%})")
+                summary = _auto_report()
+                if summary:
+                    print(f"\n{summary}")
                 return ("success", target_state)
 
+    _tick("workflow_explore_steps")
     return ("fallback", current_state_id, len(path) - 1,
             f"Completed all steps but could not confirm target state '{target_state}'")
 

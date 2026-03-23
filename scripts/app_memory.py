@@ -512,6 +512,7 @@ def quick_template_check(app_dir, component_names, img=None):
 
     total = len(component_names)
     ratio = len(matched) / total if total > 0 else 0.0
+    _tracker_auto_tick("workflow_level0")
     return matched, total, ratio
 
 
@@ -631,12 +632,16 @@ def _tracker_auto_tick(counter, n=1):
 
 
 def _tracker_auto_start():
-    """Auto-start tracker on first detection call. Called internally."""
+    """Auto-start tracker on first detection call.
+
+    Task name starts as 'auto', updated by learn_from_screenshot
+    with app_name + domain on first call.
+    """
     try:
         tracker_scripts = str(SKILL_DIR / "skills" / "gui-report" / "scripts")
         if tracker_scripts not in sys.path:
             sys.path.insert(0, tracker_scripts)
-        from tracker import _read_tokens, STATE_FILE
+        from tracker import _read_tokens, STATE_FILE, COUNTERS
         import json as _json
         tokens = _read_tokens()
         state = {
@@ -644,13 +649,25 @@ def _tracker_auto_start():
             "start_time": time.time(),
             "session_key": tokens["sessionKey"] if tokens else None,
             "tokens_start": tokens,
-            "screenshots": 0, "clicks": 0, "learns": 0,
-            "transitions": 0, "image_calls": 0,
-            "ocr_calls": 0, "detector_calls": 0,
             "notes": [],
         }
+        # Initialize all counters to 0
+        for c in COUNTERS:
+            state[c] = 0
         with open(STATE_FILE, "w") as f:
             _json.dump(state, f)
+    except Exception:
+        pass
+
+
+def _tracker_update_task(name):
+    """Update tracker task name. Called by learn_from_screenshot."""
+    try:
+        tracker_scripts = str(SKILL_DIR / "skills" / "gui-report" / "scripts")
+        if tracker_scripts not in sys.path:
+            sys.path.insert(0, tracker_scripts)
+        from tracker import update_task_name
+        update_task_name(name)
     except Exception:
         pass
 
@@ -669,7 +686,7 @@ def task_report(task_name=None):
         tracker_scripts = str(SKILL_DIR / "skills" / "gui-report" / "scripts")
         if tracker_scripts not in sys.path:
             sys.path.insert(0, tracker_scripts)
-        from tracker import STATE_FILE, _read_tokens, _fmt, LOG_DIR, LOG_FILE
+        from tracker import STATE_FILE, _read_tokens, _fmt, LOG_DIR, LOG_FILE, COUNTERS
         import json as _json
 
         if not STATE_FILE.exists():
@@ -700,7 +717,7 @@ def task_report(task_name=None):
         time_str = f"{elapsed:.1f}s" if elapsed < 60 else (f"{elapsed/60:.1f}min" if elapsed < 3600 else f"{elapsed/3600:.1f}h")
 
         ops = []
-        for key in ["screenshots", "clicks", "learns", "transitions", "ocr_calls", "detector_calls", "image_calls"]:
+        for key in COUNTERS:
             v = state.get(key, 0)
             if v > 0:
                 ops.append(f"{v}×{key}")
@@ -727,9 +744,7 @@ def task_report(task_name=None):
             "input_delta": input_end - input_start,
             "output_delta": output_end - output_start,
             "cache_read_delta": cache_end - cache_start,
-            "operations": {k: state.get(k, 0) for k in
-                           ["screenshots", "clicks", "learns", "transitions",
-                            "ocr_calls", "detector_calls", "image_calls"]},
+            "operations": {k: state.get(k, 0) for k in COUNTERS},
         }
         with open(LOG_FILE, "a") as f:
             f.write(_json.dumps(log_entry) + "\n")
@@ -1933,6 +1948,12 @@ def learn_from_screenshot(img_path, domain=None, app_name="chromium", page_name=
 
     _tracker_auto_tick("screenshots")
     _tracker_auto_tick("learns")
+
+    # Auto-update tracker task name with app/domain info
+    task_name = f"{app_name}"
+    if domain:
+        task_name += f"/{domain}"
+    _tracker_update_task(task_name)
 
     # Get save directory
     if domain:
