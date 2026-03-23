@@ -41,7 +41,7 @@ Reference scores from the [OSWorld leaderboard](https://os-world.github.io/):
 │  Mac Host (Apple Silicon)                               │
 │  ┌─────────────────────────────────────────────────┐    │
 │  │  OpenClaw (runtime framework)                   │    │
-│  │  └─ Claude Opus 4.6 (LLM reasoning & planning) │    │
+│  │  └─ Claude Opus 4.6 (LLM reasoning & planning)  │    │
 │  │     └─ GUIClaw Skill                            │    │
 │  │        ├─ Salesforce/GPA-GUI-Detector (UI det.) │    │
 │  │        ├─ Apple Vision OCR (text recognition)   │    │
