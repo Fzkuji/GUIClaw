@@ -101,7 +101,7 @@ GUIClaw runs on the following stack:
 | 22 | `f3b19d1e` | Find FAQ page about ticket delivery on Ticketek | 1.0 | ✅ | ⚠️ Website restructured: old URL `Ticket-Delivery-FAQs` no longer exists (now `Ticket-Delivery`). Eval passed on URL pattern match but actual page shows 404. |
 | 23 | `82bc8d6a` | Look up Mumbai→Stockholm flight on Qatar Airways | 1.0 | ✅ | From=BOM, To=STO, Date=2026-03-23 (next Monday) |
 | 24 | `c1fa57f3` | Open baggage fee calculator on United Airlines | 1.0 | ✅ | OCR-guided: Home → Travel Info → Baggage → Calculator |
-| 25 | `da46d875` | Book TAP appointment at MBTA Charlie Card Store | — | ✅ | Infeasible: 10:15 AM slot does not exist in live Outlook Bookings (available: 8:30-8:55, 9:25, 11:40-11:55 only). Verified twice. |
+| 25 | `da46d875` | Book TAP appointment at MBTA Charlie Card Store | 0.0 | ❌ | 10:15 AM slot not available in live Outlook Bookings (env change). OSWorld labels this as feasible. |
 | 26 | `6c4c23a1` | Find SEA→NYC flights with Miles on Delta | 1.0 | ✅ | Privacy dialog dismissed → From/To/Date → Shop with Miles checkbox (click text, not icon) |
 | 27 | `f79439ad` | Search DUB→VIE one-way flight on Ryanair | 1.0 | ✅ | Cookie dismiss → Dublin/Vienna → One way → Apr 10 → 2 adults |
 | 28 | `b7895e80` | Find NYC hotel, lowest price, next weekend | 1.0 | ✅ | TripAdvisor: Mar 28-29, 1 Room 2 Guests, Sort Price low to high |
