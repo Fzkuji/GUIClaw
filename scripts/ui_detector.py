@@ -382,9 +382,15 @@ def detect_all(img_path, conf=0.1, iou=0.3):
         _report_dir = str(Path(__file__).parent.parent / "skills" / "gui-report" / "scripts")
         if _report_dir not in _sys.path:
             _sys.path.insert(0, _report_dir)
-        from tracker import tick_counter, update_task_name, STATE_FILE
+        from tracker import tick_counter, STATE_FILE, LAST_REPORT_FILE
         if not STATE_FILE.exists():
-            # Auto-start tracker
+            # Show last report summary if available
+            if LAST_REPORT_FILE.exists():
+                try:
+                    print(LAST_REPORT_FILE.read_text().strip())
+                    LAST_REPORT_FILE.unlink()
+                except Exception:
+                    pass
             from tracker import start as _start
             class _Args:
                 task = "auto"

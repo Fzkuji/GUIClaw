@@ -388,6 +388,33 @@ def _build_report(state, tokens_now, save=False, cleanup=False):
     return formatted, log_entry
 
 
+def one_line_summary(state, tokens_now):
+    """Generate a one-line report summary."""
+    elapsed = time.time() - state.get("start_time", time.time())
+    tokens_start = state.get("tokens_start") or {}
+    t_delta = (tokens_now.get("totalTokens", 0) if tokens_now else 0) - tokens_start.get("totalTokens", 0)
+
+    detect = state.get("detector_calls", 0)
+    clicks = state.get("clicks", 0)
+    auto_s = state.get("workflow_auto_steps", 0)
+    explore_s = state.get("workflow_explore_steps", 0)
+
+    parts = [f"⏱{_fmt_time(elapsed)}", f"🪙+{_fmt(t_delta)}"]
+    if detect:
+        parts.append(f"🔍{detect}")
+    if clicks:
+        parts.append(f"🖱{clicks}")
+    if auto_s or explore_s:
+        total = auto_s + explore_s
+        rate = int(auto_s / total * 100) if total else 0
+        parts.append(f"🗺auto:{rate}%")
+
+    return "📊 " + " | ".join(parts)
+
+
+LAST_REPORT_FILE = Path(__file__).parent / ".last_report.txt"
+
+
 def auto_report():
     """Generate inline report string. Does NOT save or cleanup."""
     if not STATE_FILE.exists():
@@ -403,7 +430,7 @@ def auto_report():
 
 
 def report(args):
-    """Generate final report, save to log, cleanup state."""
+    """Generate final report, save to log, save one-line summary, cleanup state."""
     if not STATE_FILE.exists():
         print("⚠ No active tracker.")
         return
@@ -412,8 +439,14 @@ def report(args):
     session = args.session if hasattr(args, 'session') else None
     tokens_now = _read_tokens(state.get("session_key") or session)
     formatted, log_entry = _build_report(state, tokens_now, save=True, cleanup=True)
-    print(formatted)
-    print(f"💾 Saved to {LOG_FILE}")
+
+    # Save one-line summary for next detect_all to display
+    try:
+        summary = one_line_summary(state, tokens_now)
+        with open(LAST_REPORT_FILE, "w") as f:
+            f.write(summary)
+    except Exception:
+        pass
 
 
 def history(args):
