@@ -27,6 +27,47 @@ GPA_MODEL = os.path.expanduser("~/GPA-GUI-Detector/model.pt")
 SCREEN_W = 1512
 SCREEN_H = 982
 
+# ═══════════════════════════════════════════
+# Coordinate system utilities
+# ═══════════════════════════════════════════
+# Two coordinate spaces:
+#   - Screenshot pixels (2x on Retina): used by screencapture, GPA, template match, cv2
+#   - Logical pixels (pynput): used by pynput click_at, osascript window bounds
+# Conversion: logical = screenshot / backing_scale
+# detect_all() is the single exit point — it returns logical (pynput) coords.
+# Functions that crop/annotate images must convert back: px = logical * scale.
+
+_backing_scale_cache = None
+
+
+def get_backing_scale():
+    """Get Mac display backing scale factor (2.0 for Retina, 1.0 otherwise).
+
+    Uses NSScreen.main.backingScaleFactor via Swift. Result is cached for the
+    lifetime of the process (display config doesn't change mid-run).
+    Non-Mac environments return 1.0.
+    """
+    global _backing_scale_cache
+    if _backing_scale_cache is not None:
+        return _backing_scale_cache
+
+    import platform
+    if platform.system() != "Darwin":
+        _backing_scale_cache = 1.0
+        return 1.0
+
+    try:
+        r = subprocess.run(
+            ["swift", "-e", 'import AppKit; print(NSScreen.main!.backingScaleFactor)'],
+            capture_output=True, text=True, timeout=10
+        )
+        val = float(r.stdout.strip())
+        _backing_scale_cache = val
+        return val
+    except Exception:
+        _backing_scale_cache = 2.0  # Safe default for Mac Retina
+        return 2.0
+
 
 # ═══════════════════════════════════════════
 # Screenshot utilities
@@ -146,13 +187,17 @@ def detect_icons(img_path, conf=0.1, iou=0.3):
 # Apple Vision OCR
 # ═══════════════════════════════════════════
 
-def detect_text(img_path, return_logical=True):
+def detect_text(img_path, return_logical=False):
     """Detect text using Apple Vision framework.
+
+    Returns coordinates in screenshot pixel space (same as GPA detect_icons).
+    Coordinate conversion to logical (pynput) space happens in detect_all().
 
     Args:
         img_path: path to screenshot image
-        return_logical: if True, auto-convert retina coords to logical coords.
-                       Detects scale by comparing image width to screen logical width.
+        return_logical: DEPRECATED. Kept for backwards compatibility.
+                       Previously auto-converted retina coords to logical coords.
+                       Now defaults to False — callers should use detect_all() instead.
     """
     swift_code = r'''
 import Vision
@@ -364,17 +409,33 @@ def detect_all(img_path, conf=0.1, iou=0.3):
         - img_w, img_h: image dimensions
     """
     # GPA-GUI-Detector: REQUIRED — if this fails, we have nothing
-    icons, img_w, img_h = detect_icons(img_path, conf=conf, iou=iou)
+    icons, img_w, img_h = detect_icons(img_path, conf=conf, iou=iou)  # screenshot pixels
 
     # OCR: OPTIONAL — graceful degradation if unavailable
     texts = []
     try:
-        texts = detect_text(img_path)
+        texts = detect_text(img_path, return_logical=False)  # screenshot pixels
     except Exception as ex:
         # OCR may not be available on non-Mac platforms — that's OK
         pass
 
-    merged = merge_elements(icons, texts)
+    merged = merge_elements(icons, texts)  # screenshot pixels
+
+    # ── Unified coordinate conversion: screenshot pixels → logical (pynput) ──
+    # Only convert merged (which contains all elements). icons/texts are views
+    # into merged's objects, so converting merged converts them all exactly once.
+    scale = get_backing_scale()
+    if scale != 1.0:
+        coord_keys = ("cx", "cy", "x", "y", "w", "h")
+        converted = set()
+        for el in merged:
+            eid = id(el)
+            if eid in converted:
+                continue
+            converted.add(eid)
+            for k in coord_keys:
+                if k in el:
+                    el[k] = int(el[k] / scale)
 
     # Auto-tick tracker (best-effort, never fail)
     try:
@@ -468,12 +529,27 @@ def merge_elements(icon_elements, text_elements, ax_elements=None, iou_threshold
 # ═══════════════════════════════════════════
 
 def annotate_image(img_path, elements, out_path=None, retina_scale=2):
-    """Draw bounding boxes and labels on image."""
+    """Draw bounding boxes and labels on image.
+
+    Elements may be in logical (pynput) coordinates if they came from detect_all().
+    The function auto-scales them back to screenshot pixels for drawing using
+    get_backing_scale(). The retina_scale parameter is DEPRECATED.
+    """
     import cv2
 
     img = cv2.imread(img_path)
     if img is None:
         return None
+
+    # Auto-detect if coordinates need scaling up for annotation.
+    # If elements are in logical coords (from detect_all), scale them up.
+    # Heuristic: if image width > 2x the max element x+w, coords are logical.
+    scale = get_backing_scale()
+    needs_upscale = False
+    if scale != 1.0 and elements:
+        max_right = max((el.get("x", 0) + el.get("w", 0)) for el in elements) if elements else 0
+        if max_right > 0 and img.shape[1] / max_right > 1.5:
+            needs_upscale = True
 
     colors = {
         "icon": (0, 255, 0),       # green
@@ -483,12 +559,18 @@ def annotate_image(img_path, elements, out_path=None, retina_scale=2):
     }
 
     for el in elements:
-        x, y, w, h = el["x"], el["y"], el["w"], el["h"]
+        if needs_upscale:
+            x = int(el["x"] * scale)
+            y = int(el["y"] * scale)
+            w = int(el["w"] * scale)
+            h = int(el["h"] * scale)
+        else:
+            x, y, w, h = el["x"], el["y"], el["w"], el["h"]
         color = colors.get(el["type"], (255, 255, 255))
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
 
         # Label
-        label = f"{el['id']}"
+        label = f"{el.get('id', '')}"
         if el.get("label"):
             label += f":{el['label'][:15]}"
         cv2.putText(img, label, (x, max(y - 3, 12)),
@@ -550,13 +632,22 @@ def detect_all_mac(app_name=None, fullscreen=False, include_ax=False,
         ax_elements.extend(detect_ax_menubar())
         print(f"  ♿ AX: {len(ax_elements)} elements ({time.time()-t3:.1f}s)")
 
-    # 5. Merge & dedup
+    # 5. Merge & dedup (still in screenshot pixels)
     all_elements = merge_elements(icon_elements, text_elements, ax_elements,
                                    iou_threshold=merge_iou)
     print(f"  🔗 Merged: {len(all_elements)} total ({time.time()-t0:.1f}s)")
 
-    # 6. Annotate
+    # 6. Annotate (must use screenshot pixel coords — annotation draws on raw image)
     annotated_path = annotate_image(img_path, all_elements)
+
+    # 7. Convert all coordinates to logical (pynput) space
+    scale = get_backing_scale()
+    if scale != 1.0:
+        coord_keys = ("cx", "cy", "x", "y", "w", "h")
+        for el in all_elements:
+            for k in coord_keys:
+                if k in el:
+                    el[k] = int(el[k] / scale)
 
     return all_elements, img_path, annotated_path
 

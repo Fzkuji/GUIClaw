@@ -834,8 +834,10 @@ def capture_window(app_name, out_path=None):
     subprocess.run(["/usr/sbin/screencapture", "-x", "/tmp/_full.png"],
                    check=True, timeout=5)
     img = cv2.imread("/tmp/_full.png")
-    # Retina: logical * 2 = physical
-    rx, ry, rw, rh = win_x * 2, win_y * 2, win_w * 2, win_h * 2
+    # Convert logical window bounds to screenshot pixel coords for cropping
+    from ui_detector import get_backing_scale
+    bs = get_backing_scale()
+    rx, ry, rw, rh = int(win_x * bs), int(win_y * bs), int(win_w * bs), int(win_h * bs)
     crop = img[ry:ry+rh, rx:rx+rw]
     cv2.imwrite(out_path, crop)
 
@@ -992,9 +994,12 @@ MACOS_SYSTEM_COMPONENTS = {
 
 
 def _is_traffic_light(el, win_w, win_h):
-    """Check if element overlaps with macOS traffic light buttons."""
-    rel_x = el.get("cx", 0) // 2
-    rel_y = el.get("cy", 0) // 2
+    """Check if element overlaps with macOS traffic light buttons.
+    
+    Coordinates are in logical (pynput) space (from detect_all).
+    """
+    rel_x = el.get("cx", 0)
+    rel_y = el.get("cy", 0)
     # Traffic lights are at top-left, roughly x < 70, y < 30
     return rel_x < 70 and rel_y < 30
 
@@ -1027,10 +1032,10 @@ def should_save_component(el, win_w, win_h):
     if w < 25 or h < 25:
         return False, "too_small"
 
-    # Get position
+    # Get position (already in logical pixels from detect_all)
     cx, cy = el.get("cx", 0), el.get("cy", 0)
-    rel_x = cx // 2  # Convert to logical pixels
-    rel_y = cy // 2
+    rel_x = cx
+    rel_y = cy
 
     # Define regions (relative to window size)
     is_sidebar = rel_x < win_w * 0.15  # Left 15%
@@ -1461,8 +1466,9 @@ def match_component(app_name, component_name, img=None, threshold=0.8):
     If img is None, takes a full screen screenshot automatically.
     Templates are learned from app window crops but matched on any image.
     Returns: (found, logical_x, logical_y, confidence) or (False, 0, 0, 0)
-    Coordinates are in logical screen pixels (retina ÷ 2).
+    Coordinates are in logical (pynput) pixels.
     """
+    from ui_detector import get_backing_scale
     app_dir = get_app_dir(app_name)
     profile = load_profile(app_name)
 
@@ -1499,9 +1505,12 @@ def match_component(app_name, component_name, img=None, threshold=0.8):
     _, max_val, _, max_loc = cv2.minMaxLoc(result)
 
     if max_val >= threshold:
-        # Convert to logical pixels (÷2 for retina)
-        logical_x = max_loc[0] // 2 + template.shape[1] // 4
-        logical_y = max_loc[1] // 2 + template.shape[0] // 4
+        # Template match returns screenshot pixel coords — convert to logical
+        scale = get_backing_scale()
+        phys_cx = max_loc[0] + template.shape[1] // 2
+        phys_cy = max_loc[1] + template.shape[0] // 2
+        logical_x = int(phys_cx / scale)
+        logical_y = int(phys_cy / scale)
         return True, logical_x, logical_y, round(max_val, 4)
 
     return False, 0, 0, 0
@@ -1610,6 +1619,7 @@ def learn_app(app_name, page_name=None):
 
         # --- Smart naming ---
         # Rule: filename = content description, NOT coordinates
+        # Note: detect_all now returns logical (pynput) coordinates
         if el.get("label"):
             # Has text label → use it
             comp_name = el["label"].replace(" ", "_").replace("/", "-")[:30]
@@ -1620,8 +1630,8 @@ def learn_app(app_name, page_name=None):
                 comp_name = nearest_label.replace(" ", "_").replace("/", "-")[:30]
             else:
                 # Last resort: use "unlabeled_<region>_<position>"
-                rel_x = el["cx"] // 2
-                rel_y = el["cy"] // 2
+                rel_x = el["cx"]
+                rel_y = el["cy"]
                 if rel_x < 60:
                     region = "leftbar"
                 elif rel_y < 50:
@@ -1635,19 +1645,25 @@ def learn_app(app_name, page_name=None):
         # --- Check if already known (by similar position) ---
         is_new = True
         for existing_name, existing in profile["components"].items():
-            if (abs(existing.get("rel_x", 0) - el["cx"] // 2) < 15 and
-                abs(existing.get("rel_y", 0) - el["cy"] // 2) < 15):
+            if (abs(existing.get("rel_x", 0) - el["cx"]) < 15 and
+                abs(existing.get("rel_y", 0) - el["cy"]) < 15):
                 is_new = False
                 comp_name = existing_name  # Keep existing name
                 break
 
-        # --- Crop icon ---
-        x, y, w, h = el["x"], el["y"], el["w"], el["h"]
+        # --- Crop icon from screenshot image ---
+        # detect_all returns logical coords; convert back to screenshot pixels for cropping
+        from ui_detector import get_backing_scale
+        bs = get_backing_scale()
+        px_x = int(el["x"] * bs)
+        px_y = int(el["y"] * bs)
+        px_w = int(el["w"] * bs)
+        px_h = int(el["h"] * bs)
         pad = 4
-        y1 = max(0, y - pad)
-        x1 = max(0, x - pad)
-        y2 = min(img.shape[0], y + h + pad)
-        x2 = min(img.shape[1], x + w + pad)
+        y1 = max(0, px_y - pad)
+        x1 = max(0, px_x - pad)
+        y2 = min(img.shape[0], px_y + px_h + pad)
+        x2 = min(img.shape[1], px_x + px_w + pad)
         crop = img[y1:y2, x1:x2]
 
         if crop.size == 0:
@@ -1661,15 +1677,15 @@ def learn_app(app_name, page_name=None):
             el["duplicate_of"] = dup_name
             continue
 
-        # --- Save icon image ---
+        # --- Save icon image (in screenshot pixel coords for the crop) ---
         icon_file = save_component_icon(
             app_name, comp_name, img,
-            (el["x"], el["y"], el["w"], el["h"])
+            (px_x, px_y, px_w, px_h)
         )
 
-        # Relative coordinates (logical pixels, relative to window top-left)
-        rel_x = el["cx"] // 2  # retina → logical
-        rel_y = el["cy"] // 2
+        # Relative coordinates (already logical from detect_all)
+        rel_x = el["cx"]
+        rel_y = el["cy"]
         
         # Assign region
         region = assign_region(el, win_w, win_h)
@@ -1679,8 +1695,8 @@ def learn_app(app_name, page_name=None):
             "source": el.get("source", "unknown"),
             "rel_x": rel_x,
             "rel_y": rel_y,
-            "w": el["w"] // 2,
-            "h": el["h"] // 2,
+            "w": el["w"],
+            "h": el["h"],
             "icon_file": icon_file,
             "label": el.get("label"),
             "confidence": el.get("confidence", 0),
@@ -1825,6 +1841,9 @@ def learn_site(app_name="Google Chrome", page_name="main"):
     dup_count = 0
     icons_dir = site_dir / "components"
 
+    from ui_detector import get_backing_scale
+    bs = get_backing_scale()
+
     for el in all_elements:
         if el.get("label"):
             comp_name = el["label"].replace(" ", "_").replace("/", "-")[:30]
@@ -1833,25 +1852,28 @@ def learn_site(app_name="Google Chrome", page_name="main"):
             if nearest_label:
                 comp_name = nearest_label.replace(" ", "_").replace("/", "-")[:30]
             else:
-                rel_x = el["cx"] // 2
-                rel_y = el["cy"] // 2
+                rel_x = el["cx"]
+                rel_y = el["cy"]
                 comp_name = f"unlabeled_{rel_x}_{rel_y}"
 
-        # Dedup by position
+        # Dedup by position (coords already logical from detect_all)
         is_new = True
         for existing_name, existing in components.items():
-            if (abs(existing.get("rel_x", 0) - el["cx"] // 2) < 15 and
-                abs(existing.get("rel_y", 0) - el["cy"] // 2) < 15):
+            if (abs(existing.get("rel_x", 0) - el["cx"]) < 15 and
+                abs(existing.get("rel_y", 0) - el["cy"]) < 15):
                 is_new = False
                 comp_name = existing_name
                 break
 
-        # Crop
-        x, y, w, h = el["x"], el["y"], el["w"], el["h"]
+        # Crop from screenshot image (convert logical → screenshot pixels)
+        px_x = int(el["x"] * bs)
+        px_y = int(el["y"] * bs)
+        px_w = int(el["w"] * bs)
+        px_h = int(el["h"] * bs)
         pad = 4
-        y1, x1 = max(0, y-pad), max(0, x-pad)
-        y2 = min(img.shape[0], y+h+pad)
-        x2 = min(img.shape[1], x+w+pad)
+        y1, x1 = max(0, px_y-pad), max(0, px_x-pad)
+        y2 = min(img.shape[0], px_y+px_h+pad)
+        x2 = min(img.shape[1], px_x+px_w+pad)
         crop = img[y1:y2, x1:x2]
         if crop.size == 0:
             continue
@@ -1867,14 +1889,14 @@ def learn_site(app_name="Google Chrome", page_name="main"):
         icon_path = icons_dir / f"{safe_name}.png"
         cv2.imwrite(str(icon_path), crop)
 
-        rel_x = el["cx"] // 2
-        rel_y = el["cy"] // 2
+        rel_x = el["cx"]
+        rel_y = el["cy"]
         now = time.strftime("%Y-%m-%d %H:%M:%S")
 
         components[comp_name] = {
             "type": el["type"], "source": el.get("source", "unknown"),
             "rel_x": rel_x, "rel_y": rel_y,
-            "w": el["w"] // 2, "h": el["h"] // 2,
+            "w": el["w"], "h": el["h"],
             "icon_file": f"components/{safe_name}.png",
             "label": el.get("label"), "confidence": el.get("confidence", 0),
             "page": page_name, "learned_at": now,
@@ -1931,7 +1953,11 @@ def learn_from_screenshot(img_path, domain=None, app_name="chromium", page_name=
         return {"saved": 0, "components": []}
 
     img_h, img_w = img.shape[:2]
-    scale = 2 if retina else 1
+    # DEPRECATED: retina parameter no longer used for coordinate conversion.
+    # detect_all() now handles all coordinate conversion internally.
+    # The scale variable is kept only for backwards compatibility in cropping.
+    from ui_detector import get_backing_scale
+    scale = get_backing_scale() if retina else 1
 
     # Auto-generate page_name from domain + timestamp if not provided
     if not page_name:
@@ -2455,10 +2481,12 @@ def match_on_fullscreen(app_name, component_name, threshold=0.8, screen_img=None
         return False, 0, 0, 0
 
     # Physical pixel center → logical screen coords
+    from ui_detector import get_backing_scale
+    scale = get_backing_scale()
     phys_x = max_loc[0] + template.shape[1] // 2
     phys_y = max_loc[1] + template.shape[0] // 2
-    logical_x = phys_x // 2
-    logical_y = phys_y // 2
+    logical_x = int(phys_x / scale)
+    logical_y = int(phys_y / scale)
 
     # Validate: match must be within app's window (reject matches from other apps)
     bounds = get_window_bounds(app_name)
@@ -2523,8 +2551,10 @@ def _detect_visible_components(app_name, screen_img=None):
             # Validate match is within app window
             if bounds:
                 wx, wy, ww, wh = bounds
-                lx = (max_loc[0] + template.shape[1] // 2) // 2
-                ly = (max_loc[1] + template.shape[0] // 2) // 2
+                from ui_detector import get_backing_scale as _gbs
+                _s = _gbs()
+                lx = int((max_loc[0] + template.shape[1] // 2) / _s)
+                ly = int((max_loc[1] + template.shape[0] // 2) / _s)
                 margin = 30
                 if not (wx - margin <= lx <= wx + ww + margin and
                         wy - margin <= ly <= wy + wh + margin):
