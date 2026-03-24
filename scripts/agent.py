@@ -187,16 +187,34 @@ def action_report(tokens=None):
 
 
 def get_retina_scale():
-    """DEPRECATED — always returns 1.
+    """Detect display scale factor (Retina 2x, non-Retina 1x, etc).
 
-    Coordinates are now unified as screenshot pixels.
-    screencapture output matches pynput/CGEvent coordinate space directly.
-    No conversion needed.
+    Screenshots are in physical pixels. cliclick uses logical pixels.
+    Scale = screenshot_pixels / logical_pixels.
     """
-    return 1
+    try:
+        import cv2
+        subprocess.run(["/usr/sbin/screencapture", "-x", "/tmp/_scale.png"],
+                       capture_output=True, timeout=3)
+        img = cv2.imread("/tmp/_scale.png")
+        pixel_w = img.shape[1]
+        # Get logical width from window manager
+        r = subprocess.run(["osascript", "-e",
+            'tell application "Finder" to get bounds of window of desktop'],
+            capture_output=True, text=True, timeout=3)
+        if r.stdout.strip():
+            parts = r.stdout.strip().split(", ")
+            logical_w = int(parts[2])
+        else:
+            # Fallback: common logical widths
+            logical_w = pixel_w // 2 if pixel_w > 2000 else pixel_w
+        scale = pixel_w / logical_w if logical_w > 0 else 2
+        return max(1, round(scale))
+    except:
+        return 2  # Default to Retina 2x
 
 
-RETINA_SCALE = 1  # Deprecated — screenshot pixels = click pixels, no scaling needed
+RETINA_SCALE = get_retina_scale()
 
 # Python env
 VENV = os.path.expanduser("~/gui-actor-env/bin/python3")
@@ -386,9 +404,9 @@ def observe_state(app_name, include_gpa=False):
     bounds = get_window_bounds(app_name)
     state["window"] = bounds  # (x, y, w, h) or None
 
-    # 4. Screenshot → OCR on original image → coordinates are screenshot pixels
+    # 4. Screenshot (retina) → OCR on original retina image → coords ÷2 = logical
     #    IMPORTANT: Do NOT resize before OCR. Resized images give wrong coordinates.
-    #    All coordinates = screenshot pixels. No conversion needed.
+    #    Use ui_detector.detect_text() which handles retina coords correctly.
     subprocess.run(["/usr/sbin/screencapture", "-x", "/tmp/_observe.png"],
                    capture_output=True, timeout=5)
     # Also save resized version for explore/display
@@ -396,13 +414,13 @@ def observe_state(app_name, include_gpa=False):
                     "--out", "/tmp/_observe_s.png"],
                    capture_output=True, timeout=5)
 
-    # 5. Detection: OCR + GPA-GUI-Detector (all coordinates = screenshot pixels, no conversion)
+    # 5. Detection: OCR + GPA-GUI-Detector (both on original retina, auto-convert to logical)
     sys.path.insert(0, str(SCRIPT_DIR))
     try:
         import ui_detector
 
         # OCR: text elements
-        raw_text = ui_detector.detect_text("/tmp/_observe.png")
+        raw_text = ui_detector.detect_text("/tmp/_observe.png", return_logical=True)
         all_text = []
         for t in raw_text:
             all_text.append({
@@ -422,16 +440,16 @@ def observe_state(app_name, include_gpa=False):
             try:
                 icon_elements, img_w, img_h = ui_detector.detect_icons(
                     "/tmp/_observe.png", conf=0.2, iou=0.3)
-                # Coordinates are screenshot pixels — no scaling needed
+                scale = RETINA_SCALE
                 for el in icon_elements:
                     all_text.append({
                         "text": "",
-                        "cx": el.get("cx", 0),
-                        "cy": el.get("cy", 0),
-                        "x": el.get("x", 0),
-                        "y": el.get("y", 0),
-                        "w": el.get("w", 0),
-                        "h": el.get("h", 0),
+                        "cx": el.get("cx", 0) // scale,
+                        "cy": el.get("cy", 0) // scale,
+                        "x": el.get("x", 0) // scale,
+                        "y": el.get("y", 0) // scale,
+                        "w": el.get("w", 0) // scale,
+                        "h": el.get("h", 0) // scale,
                         "type": "icon",
                         "confidence": el.get("confidence", 0),
                     })
@@ -462,8 +480,8 @@ def observe_state(app_name, include_gpa=False):
             img = cv2.imread("/tmp/_observe.png")
             if img is not None:
                 wx, wy, ww, wh = bounds
-                # Coordinates = screenshot pixels, no scaling needed
-                crop = img[wy:wy+wh, wx:wx+ww]
+                # Retina: ×2
+                crop = img[wy*RETINA_SCALE:(wy+wh)*RETINA_SCALE, wx*RETINA_SCALE:(wx+ww)*RETINA_SCALE]
                 cv2.imwrite("/tmp/_observe_window.jpg", crop,
                            [cv2.IMWRITE_JPEG_QUALITY, 60])
                 state["window_screenshot"] = "/tmp/_observe_window.jpg"
@@ -1160,6 +1178,7 @@ def wait_for_component(app_name, component, timeout=120, interval=10):
         print(f"❌ Could not load template image: {comp_img}", flush=True)
         return False, 0, 0
     
+    scale = get_retina_scale()
     gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
     
     start = time.time()
@@ -1184,9 +1203,9 @@ def wait_for_component(app_name, component, timeout=120, interval=10):
             _, max_val, _, max_loc = cv2.minMaxLoc(result)
             
             if max_val >= 0.85:
-                # Coordinates = screenshot pixels, no conversion needed
-                cx = max_loc[0] + gray_template.shape[1] // 2
-                cy = max_loc[1] + gray_template.shape[0] // 2
+                # Convert retina pixels to logical
+                cx = (max_loc[0] + gray_template.shape[1] // 2) / scale
+                cy = (max_loc[1] + gray_template.shape[0] // 2) / scale
                 elapsed = time.time() - start
                 print(f"✅ Found '{component}' at ({int(cx)},{int(cy)}) conf={max_val:.2f} after {elapsed:.1f}s ({attempt} polls)", flush=True)
                 return True, int(cx), int(cy)

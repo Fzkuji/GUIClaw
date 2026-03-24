@@ -63,40 +63,15 @@ DETECT → MATCH → SAVE → EXECUTE → DETECT AGAIN → DIFF → SAVE TRANSIT
 
 所以 gui-act 的 "DETECT + SAVE" 步骤就是调用一次 `learn_from_screenshot()`。
 
-## 坐标系统设计
-
-**以截图为锚。所有坐标都是"截图上的像素坐标"。**
-
-### 为什么不做转换
-
-1. **已验证**：macOS 上 `screencapture` 输出的坐标空间和 `pynput`/`CGEvent` 使用的坐标空间一致
-   - 即使在 Retina 显示器上，screencapture 输出的是与系统 UI 坐标一致的像素
-   - pynput 使用的也是同一坐标空间
-   - 所以检测坐标可以直接传给 `click_at`，不需要任何缩放
-
-2. **验证方式**：在不同显示模式下（1512×982、1800×1169 等）测试，screencapture 输出的分辨率始终匹配 pynput 的坐标空间
-
-3. **远程 VM**：VM 上截图像素和 pyautogui 坐标也是 1:1，原理相同
-
-### 不同设备的适配策略
-
-`ui_detector.get_screenshot_scale()` 返回截图像素和点击坐标空间的比例。
-- 目前返回 1.0（已在 Mac 各种显示模式下验证）
-- 如果将来某设备不匹配，这个函数可以做自动校准
-- 校准方式：截图 → 比较截图尺寸和已知屏幕信息 → 计算比例
-
-### `retina` 参数
-
-`learn_from_screenshot` 等函数保留了 `retina` 参数（向后兼容），但它不再生效。
-坐标始终按原始截图像素存储和使用。
-
 ## 远程 VM 操作的适配
 
 本机 Mac 和远程 VM 的区别：
 - Mac: screencapture → 检测在本地跑
 - VM: 通过 HTTP API 下载截图 → 检测在 Mac 上跑 → 点击指令发回 VM
 
-所有平台上坐标都是截图像素，不需要区分 Retina/非 Retina。
+`learn_from_screenshot(img_path, retina=False)` 通过 `retina` 参数区分：
+- Mac Retina: retina=True, 坐标 ÷2
+- VM: retina=False, 坐标 1:1
 
 ## 操作前后验证
 

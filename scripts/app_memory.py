@@ -831,12 +831,12 @@ def capture_window(app_name, out_path=None):
         out_path = f"/tmp/app_memory_{app_name.lower()}.png"
 
     # Always: full screenshot + crop (consistent pixel scaling)
-    # Coordinates = screenshot pixels. No Retina scaling needed —
-    # screencapture output matches pynput/CGEvent coordinate space.
     subprocess.run(["/usr/sbin/screencapture", "-x", "/tmp/_full.png"],
                    check=True, timeout=5)
     img = cv2.imread("/tmp/_full.png")
-    crop = img[win_y:win_y+win_h, win_x:win_x+win_w]
+    # Retina: logical * 2 = physical
+    rx, ry, rw, rh = win_x * 2, win_y * 2, win_w * 2, win_h * 2
+    crop = img[ry:ry+rh, rx:rx+rw]
     cv2.imwrite(out_path, crop)
 
     return out_path, win_x, win_y, win_w, win_h
@@ -933,12 +933,12 @@ def _find_nearest_text(icon_el, text_elements, max_dist=60):
     """Find the nearest text element to an icon, to use as its name.
 
     CONSERVATIVE: only matches text that overlaps or nearly overlaps the icon
-    (within max_dist pixels). This avoids false matches in dense UIs.
+    (within max_dist retina pixels). This avoids false matches in dense UIs.
 
     For icons without a nearby match, they stay unlabeled and the agent
     identifies them later by viewing the cropped images.
 
-    All coordinates are screenshot pixels.
+    All coordinates are in retina pixels (2x logical).
 
     Returns the text label string, or None.
     """
@@ -993,9 +993,8 @@ MACOS_SYSTEM_COMPONENTS = {
 
 def _is_traffic_light(el, win_w, win_h):
     """Check if element overlaps with macOS traffic light buttons."""
-    # Coordinates are screenshot pixels, no conversion needed
-    rel_x = el.get("cx", 0)
-    rel_y = el.get("cy", 0)
+    rel_x = el.get("cx", 0) // 2
+    rel_y = el.get("cy", 0) // 2
     # Traffic lights are at top-left, roughly x < 70, y < 30
     return rel_x < 70 and rel_y < 30
 
@@ -1028,10 +1027,10 @@ def should_save_component(el, win_w, win_h):
     if w < 25 or h < 25:
         return False, "too_small"
 
-    # Get position — coordinates are screenshot pixels, no conversion needed
+    # Get position
     cx, cy = el.get("cx", 0), el.get("cy", 0)
-    rel_x = cx
-    rel_y = cy
+    rel_x = cx // 2  # Convert to logical pixels
+    rel_y = cy // 2
 
     # Define regions (relative to window size)
     is_sidebar = rel_x < win_w * 0.15  # Left 15%
@@ -1385,8 +1384,7 @@ def save_component_icon(app_name, component_name, img, bbox, retina_scale=2):
     - If no label: use "unlabeled_<position>" temporarily
     - After LLM identifies: rename to actual content description
 
-    bbox: (x, y, w, h) in screenshot pixel coordinates.
-    retina_scale: DEPRECATED — kept for backward compatibility, not used.
+    bbox: (x, y, w, h) in the window screenshot's pixel coordinates.
     """
     app_dir = get_app_dir(app_name)
     x, y, w, h = bbox
@@ -1462,8 +1460,8 @@ def match_component(app_name, component_name, img=None, threshold=0.8):
 
     If img is None, takes a full screen screenshot automatically.
     Templates are learned from app window crops but matched on any image.
-    Returns: (found, x, y, confidence) or (False, 0, 0, 0)
-    Coordinates are screenshot pixels — pass directly to click_at().
+    Returns: (found, logical_x, logical_y, confidence) or (False, 0, 0, 0)
+    Coordinates are in logical screen pixels (retina ÷ 2).
     """
     app_dir = get_app_dir(app_name)
     profile = load_profile(app_name)
@@ -1501,10 +1499,10 @@ def match_component(app_name, component_name, img=None, threshold=0.8):
     _, max_val, _, max_loc = cv2.minMaxLoc(result)
 
     if max_val >= threshold:
-        # Coordinates = screenshot pixels, no conversion needed
-        cx = max_loc[0] + template.shape[1] // 2
-        cy = max_loc[1] + template.shape[0] // 2
-        return True, cx, cy, round(max_val, 4)
+        # Convert to logical pixels (÷2 for retina)
+        logical_x = max_loc[0] // 2 + template.shape[1] // 4
+        logical_y = max_loc[1] // 2 + template.shape[0] // 4
+        return True, logical_x, logical_y, round(max_val, 4)
 
     return False, 0, 0, 0
 
@@ -1513,7 +1511,7 @@ def match_all_components(app_name, img=None, threshold=0.8):
     """Match all saved components against an image (or full screen).
 
     If img is None, takes a full screen screenshot automatically.
-    Returns: list of (component_name, x, y, confidence) in screenshot pixels.
+    Returns: list of (component_name, logical_x, logical_y, confidence)
     """
     # Take screenshot once, reuse for all components
     if img is None:
@@ -1622,14 +1620,13 @@ def learn_app(app_name, page_name=None):
                 comp_name = nearest_label.replace(" ", "_").replace("/", "-")[:30]
             else:
                 # Last resort: use "unlabeled_<region>_<position>"
-                # Coordinates are screenshot pixels, no conversion
-                rel_x = el["cx"]
-                rel_y = el["cy"]
-                if rel_x < 120:
+                rel_x = el["cx"] // 2
+                rel_y = el["cy"] // 2
+                if rel_x < 60:
                     region = "leftbar"
-                elif rel_y < 100:
+                elif rel_y < 50:
                     region = "toolbar"
-                elif rel_y > 900:
+                elif rel_y > 550:
                     region = "bottom"
                 else:
                     region = "main"
@@ -1638,8 +1635,8 @@ def learn_app(app_name, page_name=None):
         # --- Check if already known (by similar position) ---
         is_new = True
         for existing_name, existing in profile["components"].items():
-            if (abs(existing.get("rel_x", 0) - el["cx"]) < 15 and
-                abs(existing.get("rel_y", 0) - el["cy"]) < 15):
+            if (abs(existing.get("rel_x", 0) - el["cx"] // 2) < 15 and
+                abs(existing.get("rel_y", 0) - el["cy"] // 2) < 15):
                 is_new = False
                 comp_name = existing_name  # Keep existing name
                 break
@@ -1670,9 +1667,9 @@ def learn_app(app_name, page_name=None):
             (el["x"], el["y"], el["w"], el["h"])
         )
 
-        # Coordinates are screenshot pixels — no conversion needed
-        rel_x = el["cx"]
-        rel_y = el["cy"]
+        # Relative coordinates (logical pixels, relative to window top-left)
+        rel_x = el["cx"] // 2  # retina → logical
+        rel_y = el["cy"] // 2
         
         # Assign region
         region = assign_region(el, win_w, win_h)
@@ -1682,8 +1679,8 @@ def learn_app(app_name, page_name=None):
             "source": el.get("source", "unknown"),
             "rel_x": rel_x,
             "rel_y": rel_y,
-            "w": el["w"],
-            "h": el["h"],
+            "w": el["w"] // 2,
+            "h": el["h"] // 2,
             "icon_file": icon_file,
             "label": el.get("label"),
             "confidence": el.get("confidence", 0),
@@ -1836,16 +1833,15 @@ def learn_site(app_name="Google Chrome", page_name="main"):
             if nearest_label:
                 comp_name = nearest_label.replace(" ", "_").replace("/", "-")[:30]
             else:
-                # Coordinates are screenshot pixels, no conversion
-                rel_x = el["cx"]
-                rel_y = el["cy"]
+                rel_x = el["cx"] // 2
+                rel_y = el["cy"] // 2
                 comp_name = f"unlabeled_{rel_x}_{rel_y}"
 
         # Dedup by position
         is_new = True
         for existing_name, existing in components.items():
-            if (abs(existing.get("rel_x", 0) - el["cx"]) < 15 and
-                abs(existing.get("rel_y", 0) - el["cy"]) < 15):
+            if (abs(existing.get("rel_x", 0) - el["cx"] // 2) < 15 and
+                abs(existing.get("rel_y", 0) - el["cy"] // 2) < 15):
                 is_new = False
                 comp_name = existing_name
                 break
@@ -1871,15 +1867,14 @@ def learn_site(app_name="Google Chrome", page_name="main"):
         icon_path = icons_dir / f"{safe_name}.png"
         cv2.imwrite(str(icon_path), crop)
 
-        # Coordinates are screenshot pixels — no conversion needed
-        rel_x = el["cx"]
-        rel_y = el["cy"]
+        rel_x = el["cx"] // 2
+        rel_y = el["cy"] // 2
         now = time.strftime("%Y-%m-%d %H:%M:%S")
 
         components[comp_name] = {
             "type": el["type"], "source": el.get("source", "unknown"),
             "rel_x": rel_x, "rel_y": rel_y,
-            "w": el["w"], "h": el["h"],
+            "w": el["w"] // 2, "h": el["h"] // 2,
             "icon_file": f"components/{safe_name}.png",
             "label": el.get("label"), "confidence": el.get("confidence", 0),
             "page": page_name, "learned_at": now,
@@ -1917,15 +1912,13 @@ def learn_from_screenshot(img_path, domain=None, app_name="chromium", page_name=
     screenshot path as input and does NOT call any Mac-specific APIs
     (no screencapture, no osascript, no get_window_bounds).
 
-    All coordinates are screenshot pixels — no conversion needed.
-
     Args:
         img_path: Path to screenshot PNG (any source — local, VM, etc.)
         domain: Website domain (e.g. "united.com"). If None, saves to app-level memory.
         app_name: Browser/app name for memory directory (default "chromium")
         page_name: Page label (e.g. "homepage", "bags_overview"). Auto-generated if None.
-        retina: DEPRECATED — kept for backward compatibility, has no effect.
-                Coordinates are always used as-is (screenshot pixels).
+        retina: If True, coordinates are halved for logical pixels (Mac Retina).
+                If False (default), coordinates are used as-is (VMs, non-Retina).
 
     Returns: dict with saved component names and count
     """
@@ -1938,7 +1931,7 @@ def learn_from_screenshot(img_path, domain=None, app_name="chromium", page_name=
         return {"saved": 0, "components": []}
 
     img_h, img_w = img.shape[:2]
-    scale = 1  # Coordinates = screenshot pixels. retina param is deprecated.
+    scale = 2 if retina else 1
 
     # Auto-generate page_name from domain + timestamp if not provided
     if not page_name:
@@ -2117,10 +2110,10 @@ def record_page_transition(before_img_path, after_img_path, click_label, click_p
         before_img_path: Screenshot before click
         after_img_path: Screenshot after click
         click_label: What was clicked (text label or component name)
-        click_pos: (x, y) coordinates of the click (screenshot pixels)
+        click_pos: (x, y) coordinates of the click
         domain: Website domain (for browser sites)
         app_name: App/browser name
-        retina: DEPRECATED — kept for backward compatibility, has no effect.
+        retina: Whether to halve coordinates
 
     Returns: dict with appeared/disappeared/transition info
     """
@@ -2389,11 +2382,11 @@ def detect_with_memory(app_name, threshold=0.8):
     # Filter out known (matched) elements
     unknown = []
     for el in all_elements:
-        el_cx = el["cx"]
-        el_cy = el["cy"]
+        el_rx = el["cx"] // 2
+        el_ry = el["cy"] // 2
         is_known = False
         for name, rx, ry, conf in known:
-            if abs(el_cx - rx) < 20 and abs(el_cy - ry) < 20:
+            if abs(el_rx - rx) < 20 and abs(el_ry - ry) < 20:
                 is_known = True
                 el["matched_name"] = name
                 break
@@ -2413,7 +2406,7 @@ def match_on_fullscreen(app_name, component_name, threshold=0.8, screen_img=None
     """Match a component template on screen, scoped to the app's window area.
 
     Searches within the app's window bounds (+padding) to avoid false matches
-    from other apps. Returns screenshot pixel coords directly.
+    from other apps. Returns screen logical coords directly.
     
     Args:
         app_name: App name
@@ -2421,7 +2414,7 @@ def match_on_fullscreen(app_name, component_name, threshold=0.8, screen_img=None
         threshold: Minimum match confidence (default 0.8)
         screen_img: Pre-loaded full screen image (optional, avoids re-capture)
     
-    Returns: (found, x, y, confidence) in screenshot pixels
+    Returns: (found, logical_x, logical_y, confidence)
     """
     profile = load_profile(app_name)
     comp = profile["components"].get(component_name)
@@ -2461,21 +2454,23 @@ def match_on_fullscreen(app_name, component_name, threshold=0.8, screen_img=None
     if max_val < threshold:
         return False, 0, 0, 0
 
-    # Screenshot pixel center — no conversion needed
-    cx = max_loc[0] + template.shape[1] // 2
-    cy = max_loc[1] + template.shape[0] // 2
+    # Physical pixel center → logical screen coords
+    phys_x = max_loc[0] + template.shape[1] // 2
+    phys_y = max_loc[1] + template.shape[0] // 2
+    logical_x = phys_x // 2
+    logical_y = phys_y // 2
 
     # Validate: match must be within app's window (reject matches from other apps)
     bounds = get_window_bounds(app_name)
     if bounds:
         wx, wy, ww, wh = bounds
-        margin = 30  # pixels tolerance for shadows/titlebar
-        if not (wx - margin <= cx <= wx + ww + margin and
-                wy - margin <= cy <= wy + wh + margin):
+        margin = 30  # logical pixels tolerance for shadows/titlebar
+        if not (wx - margin <= logical_x <= wx + ww + margin and
+                wy - margin <= logical_y <= wy + wh + margin):
             # Match is outside the app window — likely a false match from another app
             return False, 0, 0, 0
 
-    return True, cx, cy, round(max_val, 4)
+    return True, logical_x, logical_y, round(max_val, 4)
 
 
 def _detect_visible_components(app_name, screen_img=None):
@@ -2528,11 +2523,11 @@ def _detect_visible_components(app_name, screen_img=None):
             # Validate match is within app window
             if bounds:
                 wx, wy, ww, wh = bounds
-                cx = max_loc[0] + template.shape[1] // 2
-                cy = max_loc[1] + template.shape[0] // 2
+                lx = (max_loc[0] + template.shape[1] // 2) // 2
+                ly = (max_loc[1] + template.shape[0] // 2) // 2
                 margin = 30
-                if not (wx - margin <= cx <= wx + ww + margin and
-                        wy - margin <= cy <= wy + wh + margin):
+                if not (wx - margin <= lx <= wx + ww + margin and
+                        wy - margin <= ly <= wy + wh + margin):
                     continue
             visible.add(comp_name)
         except Exception:

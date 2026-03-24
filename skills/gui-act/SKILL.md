@@ -241,13 +241,11 @@ Screenshot → template match against saved components → instant recognition
 
 ## How Coordinates Work
 
-**All coordinates = screenshot pixels. detect_all returns them, click_at uses them. No conversion needed.**
-
 | Source | Method | Precision |
 |---|---|---|
-| Saved component | Template matching (`match_all_components`) | Pixel-precise (screenshot pixels) |
-| Text element | OCR (`detect_text`) | Bbox-precise (screenshot pixels) |
-| UI component | GPA-GUI-Detector (`detect_icons`) | Bbox-precise (screenshot pixels) |
+| Saved component | Template matching (`match_all_components`) | Pixel-precise |
+| Text element | OCR (`detect_text`) | Bbox-precise |
+| UI component | GPA-GUI-Detector (`detect_icons`) | Bbox-precise |
 | **image tool** | **NEVER for coordinates** | **Understanding only** |
 
 ## Not Found?
