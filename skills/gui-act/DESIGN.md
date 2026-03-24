@@ -69,9 +69,12 @@ DETECT → MATCH → SAVE → EXECUTE → DETECT AGAIN → DIFF → SAVE TRANSIT
 - Mac: screencapture → 检测在本地跑
 - VM: 通过 HTTP API 下载截图 → 检测在 Mac 上跑 → 点击指令发回 VM
 
-`learn_from_screenshot(img_path, retina=False)` 通过 `retina` 参数区分：
-- Mac Retina: retina=True, 坐标 ÷2
-- VM: retina=False, 坐标 1:1
+坐标转换现在由双空间系统自动处理：
+- `detect_all()` 调用 `refresh_screen_info()` 动态计算 scale
+- `detect_to_click(x, y)` / `click_to_detect(x, y)` 处理空间转换
+- Mac Retina：检测空间 ≈ 2× 点击空间
+- VM：scale = 1:1
+- 不再需要手动传 `retina` 参数
 
 ## 坐标系统
 

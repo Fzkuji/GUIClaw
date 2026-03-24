@@ -218,7 +218,7 @@ def get_retina_scale():
 RETINA_SCALE = get_retina_scale()
 
 # Python env
-VENV = os.path.expanduser("~/gui-actor-env/bin/python3")
+VENV = os.path.expanduser("~/gui-agent-env/bin/python3")
 if not os.path.exists(VENV):
     VENV = "python3"
 

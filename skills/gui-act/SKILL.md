@@ -21,7 +21,7 @@ This is the core action loop. Every action follows this flow. Do not skip any pa
 │ 4. DECIDE & EXECUTE: Pick target → click/type at coordinates     │
 │ 5. DETECT AGAIN: Screenshot → OCR (only if action might fail)    │
 │ 6. DIFF:    Compare before vs after OCR texts                    │
-│ 7. SAVE TRANSITION: Record state change to profile.json          │
+│ 7. SAVE TRANSITION: Record state change to transitions.json      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -36,7 +36,7 @@ This is the core action loop. Every action follows this flow. Do not skip any pa
 
 Two platform-independent functions handle ALL saving automatically.
 They work on any screenshot (local Mac, remote VM, downloaded image).
-**The LLM does NOT manually crop or write profile.json** — call these functions instead.
+**The LLM does NOT manually crop or write JSON files** — call these functions instead.
 
 ### `learn_from_screenshot(img_path, domain, app_name, page_name)`
 Runs GPA-GUI-Detector + OCR on a screenshot, crops all components, saves to memory.
@@ -51,8 +51,9 @@ result = learn_from_screenshot(
     domain="united.com",           # None for non-browser apps
     app_name="chromium",           # Browser or app name
     page_name="homepage",          # Human-readable page label
-    retina=False,                  # True for Mac Retina, False for VMs
 )
+# Note: Scale (detection→click) is computed dynamically by detect_all()
+# via refresh_screen_info(). No manual retina flag needed.
 # result = {"saved": 42, "new": 38, "components": ["Booking", "Travel_info", ...]}
 ```
 
@@ -68,10 +69,9 @@ result = record_page_transition(
     before_img_path="/path/to/before.png",
     after_img_path="/path/to/after.png",
     click_label="Travel_info",     # What was clicked
-    click_pos=(779, 187),          # Where it was clicked
+    click_pos=(779, 187),          # Where it was clicked (click space)
     domain="united.com",
     app_name="chromium",
-    retina=False,
 )
 # result = {"appeared": [...], "disappeared": [...], "from": "...", "to": "..."}
 ```
@@ -124,7 +124,7 @@ learn_from_screenshot(
 )
 ```
 
-This is automated — no manual cropping, no manual profile.json editing.
+This is automated — no manual cropping, no manual JSON editing.
 The function handles: detection, filtering, naming, dedup, cropping, saving.
 
 ### Step 4: DECIDE & EXECUTE
@@ -187,7 +187,7 @@ record_page_transition(
 )
 ```
 
-This automatically: runs OCR on both images, diffs them, saves states + transition to profile.json.
+This automatically: runs OCR on both images, diffs them, saves states + transition to `states.json` / `transitions.json`.
 
 ---
 
@@ -214,7 +214,7 @@ record_page_transition("screenshot.png", "new_screenshot.png",
                        click_label="Travel_info", click_pos=(779, 187),
                        domain="united.com")
 → appeared: ["Bags", "United app", ...], disappeared: [...]
-→ transition saved to profile.json
+→ transition saved to transitions.json
 
 # Now repeat steps 1-7 for clicking "Bags"...
 ```

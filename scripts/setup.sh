@@ -101,9 +101,6 @@ print('  ✅ All good!')
 echo ""
 echo "=== Setup complete ==="
 echo ""
-echo ""
-echo "=== Setup complete ==="
-echo ""
 echo "OpenClaw config — add to ~/.openclaw/openclaw.json:"
 echo '  {'
 echo '    "skills": { "entries": { "gui-agent": { "enabled": true } } },'
@@ -115,7 +112,7 @@ echo "  timeoutSec: 300  — GUI operations can take a while, 5 min timeout reco
 echo "  queue.mode: interrupt — send any message to abort current agent operation"
 echo ""
 echo "Usage:"
-echo "  source ~/gui-actor-env/bin/activate"
+echo "  source ~/gui-agent-env/bin/activate"
 echo "  cd $SKILL_DIR/scripts"
 echo "  python3 app_memory.py learn --app WeChat    # Learn an app"
 echo "  python3 app_memory.py detect --app WeChat   # Detect with memory"

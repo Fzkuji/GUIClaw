@@ -21,7 +21,7 @@ Data collection needs zero manual effort. Only the final `report` command needs 
 
 ```bash
 # After a GUI task finishes, generate report:
-source ~/gui-actor-env/bin/activate
+source ~/gui-agent-env/bin/activate
 python3 ~/.openclaw/workspace/skills/gui-agent/skills/gui-report/scripts/tracker.py report
 
 # View history:

@@ -8,10 +8,15 @@ Architecture:
 - Templates from window crops match full screen because both use
   the same screencapture pixel scaling (full screenshot + crop).
 
-Each app gets:
-- profile.json: window structure, known pages, component registry
+Each app gets 4 independent files (split storage):
+- meta.json: metadata (detect_count, forget_threshold, img_size)
+- components.json: component registry with activity tracking
+- states.json: states defined by component sets (Jaccard matching)
+- transitions.json: state transitions (dict, deduped by key)
 - components/: cropped component images (named by content/function)
 - pages/: page-specific layouts
+
+Old profile.json files are auto-migrated to split format on first load.
 
 Storage policy: only clean up temporary/dynamic content (timestamps,
 chat messages, notification counts) to prevent storage bloat.

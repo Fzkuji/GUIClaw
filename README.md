@@ -37,6 +37,7 @@
 
 ## 🔥 News
 
+- **[2026-03-24]** 📐 **Coordinate system refactoring** — Dual-space model (detection space vs click space) with dynamic scale computed per `detect_all()` call via `refresh_screen_info()`. No more hardcoded Retina ÷2.
 - **[2026-03-24]** 🧠 **Smart workflow navigation** — Target state verification with tiered fallback (template match → full detection → LLM). Auto performance tracking via `detect_all`.
 - **[2026-03-23]** 🏆 **OSWorld benchmark: 97.8%** — 45.0/46 Chrome tasks passed. [Results →](benchmarks/osworld/)
 - **[2026-03-23]** 🔄 **Memory overhaul** — Split storage, automatic component forgetting (15 consecutive misses → removed), state merging by Jaccard similarity.
@@ -191,14 +192,14 @@ Add to `~/.openclaw/openclaw.json`:
 ```json
 {
   "skills": { "entries": { "gui-agent": { "enabled": true } } },
-  "tools": { "exec": { "timeoutSec": 60 } },
-  "messages": { "queue": { "mode": "steer" } }
+  "tools": { "exec": { "timeoutSec": 300 } },
+  "messages": { "queue": { "mode": "interrupt" } }
 }
 ```
 
-> ⚠️ **`timeoutSec: 60`** is important — GUIClaw operations (screenshot → detect → click → wait) often take 15-30s. The default timeout is too short and will kill commands mid-execution.
+> ⚠️ **`timeoutSec: 300`** is important — GUIClaw operation chains (screenshot → detect → click → wait → verify) can take a while. A 5-minute timeout is recommended. The default is too short and will kill commands mid-execution.
 
-> 💡 **`queue.mode: "steer"`** is recommended — GUI operations take time, and steer mode lets you send corrections or new instructions that immediately interrupt the current action at the next tool-call boundary. Without it, your messages queue up and the agent won't see them until it finishes.
+> 💡 **`queue.mode: "interrupt"`** is recommended — GUI operations take time, and interrupt mode lets you send any message to immediately abort the current agent operation. Without it, your messages queue up and the agent won't see them until it finishes.
 
 Then just chat with your OpenClaw agent — it reads `SKILL.md` and handles everything automatically.
 

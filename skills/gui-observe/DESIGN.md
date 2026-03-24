@@ -47,13 +47,26 @@ Phase 2（快速观察）跳过 image tool，只用 OCR + GPA 的文字输出让
 - 操作后结果不符合预期
 - 出现弹窗、错误页面等异常
 
-## 坐标系统
+## 坐标系统（双空间模型）
 
-Mac Retina 屏幕：物理像素 = 逻辑像素 × 2
-- 截图（screencapture）：3024 × 1964 物理像素
-- 点击（pynput）：1512 × 982 逻辑像素
-- OCR 返回的坐标：已转换为逻辑像素（detect_text 内部 ÷2）
-- GPA 返回的坐标：物理像素，需要 ÷2
-- detect_all 返回：全部是物理像素，调用方根据 retina 参数决定是否 ÷2
+两个坐标空间：
+- **检测空间** = screencapture 像素（GPA、OCR、模板匹配、cv2 裁剪）
+- **点击空间** = OS 逻辑像素（pynput、pyautogui、osascript 窗口边界）
 
-远程 VM（OSWorld）：1920 × 1080，无 Retina，坐标 1:1。
+映射函数（`ui_detector.py`）：
+- `detect_to_click(x, y)`: 检测 → 点击
+- `click_to_detect(x, y)`: 点击 → 检测（用于图片裁剪）
+- `refresh_screen_info(img_w, img_h)`: 每次 `detect_all()` 时动态计算 scale
+
+| 工具 | 空间 |
+|------|------|
+| detect_icons | 检测 |
+| detect_text | 检测 |
+| template_match | 检测 |
+| detect_all 输出 | **点击** |
+| pynput click_at | 点击 |
+| cv2 图片裁剪 | 检测 |
+
+- **Mac Retina**：检测空间 ≈ 2× 点击空间（如 3024×1964 vs 1512×982）
+- **远程 VM（OSWorld）**：1920×1080，scale = 1:1（检测 == 点击）
+- scale 不再硬编码，通过 `refresh_screen_info()` 动态获取

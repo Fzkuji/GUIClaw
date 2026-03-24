@@ -36,6 +36,7 @@
 
 ## 🔥 更新日志
 
+- **[2026-03-24]** 📐 **坐标系统重构** — 双空间模型（检测空间 vs 点击空间），每次 `detect_all()` 调用时通过 `refresh_screen_info()` 动态计算 scale。不再硬编码 Retina ÷2。
 - **[2026-03-24]** 🧠 **智能工作流导航** — 目标状态分层验证（template match → 全量检测 → LLM 回退）。通过 `detect_all` 自动跟踪性能。
 - **[2026-03-23]** 🏆 **OSWorld 基准测试：97.8%** — 46 个 Chrome 任务通过 45.0 个。[查看结果 →](../benchmarks/osworld/)
 - **[2026-03-23]** 🔄 **记忆系统重构** — 拆分存储、组件自动遗忘（连续 15 次未命中 → 删除）、基于 Jaccard 相似度的状态合并。
@@ -190,14 +191,14 @@ bash scripts/setup.sh
 ```json
 {
   "skills": { "entries": { "gui-agent": { "enabled": true } } },
-  "tools": { "exec": { "timeoutSec": 60 } },
-  "messages": { "queue": { "mode": "steer" } }
+  "tools": { "exec": { "timeoutSec": 300 } },
+  "messages": { "queue": { "mode": "interrupt" } }
 }
 ```
 
-> ⚠️ **`timeoutSec: 60`** 很重要 — GUIClaw 的操作（截屏 → 检测 → 点击 → 等待）通常需要 15-30 秒，默认超时太短会中途终止命令。
+> ⚠️ **`timeoutSec: 300`** 很重要 — GUIClaw 的操作链（截屏 → 检测 → 点击 → 等待 → 验证）可能较长，推荐 5 分钟超时。默认超时太短会中途终止命令。
 
-> 💡 **`queue.mode: "steer"`** 推荐启用 — GUI 操作耗时较长，steer 模式允许你发送修正或新指令，在下一个工具调用边界立即中断当前操作。否则消息会排队，智能体完成当前动作后才能看到。
+> 💡 **`queue.mode: "interrupt"`** 推荐启用 — GUI 操作耗时较长，interrupt 模式允许你发送任意消息立即中止当前智能体操作。否则消息会排队，智能体完成当前动作后才能看到。
 
 然后直接和你的 OpenClaw 智能体对话 — 它会自动读取 `SKILL.md` 并处理一切。
 

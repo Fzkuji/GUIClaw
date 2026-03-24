@@ -163,7 +163,7 @@ Screen (0,0) ──────────────────────�
 ### Memory Saving (CRITICAL — most commonly skipped step)
 - **Save after EVERY action** — not as a separate step, but as part of the action itself
 - **ACT = detect → match → execute → detect again → diff → save** — all 7 sub-steps, every time
-- **Browser websites need per-site memory**: `memory/apps/chromium/sites/united.com/` with the same structure as any app (profile.json + components/ + pages/)
+- **Browser websites need per-site memory**: `memory/apps/chromium/sites/united.com/` with the same 4-file structure as any app (meta.json + components.json + states.json + transitions.json + components/ + pages/)
 - **Label components when saving** — OCR text → use as label; unlabeled → use image tool to identify
 - **The payoff**: first visit needs GPA + image tool (slow, expensive). Second visit uses template match only (fast, free)
 - **If you skip saving, every visit starts from scratch** — this defeats the entire purpose of the memory system
@@ -173,4 +173,4 @@ Screen (0,0) ──────────────────────�
 - **Reading SKILL.md ≠ following SKILL.md** — LLM reads rules then ignores them during execution
 - **Writing ABSOLUTE RULES doesn't help** — the same mistakes recur across sessions
 - **Merging steps helps** — separate "save memory" step was always skipped; merging it into "act" makes it harder to skip
-- **Specific > vague** — "save to memory" is vague; "crop component, save template, update profile.json, record transition" is actionable
+- **Specific > vague** — "save to memory" is vague; "crop component, save template, update components.json, record transition" is actionable

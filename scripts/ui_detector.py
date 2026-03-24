@@ -24,8 +24,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent
 SKILL_DIR = SCRIPT_DIR.parent
 GPA_MODEL = os.path.expanduser("~/GPA-GUI-Detector/model.pt")
-SCREEN_W = 1512
-SCREEN_H = 982
+SCREEN_W = 1512   # Default click-space dimensions, updated by refresh_screen_info()
+SCREEN_H = 982    # Default click-space dimensions, updated by refresh_screen_info()
 
 # ═══════════════════════════════════════════
 # Coordinate system — dual-space + mapping

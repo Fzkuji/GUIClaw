@@ -165,7 +165,7 @@ Each step in the execution flow below has a corresponding sub-skill file. **When
 **exec timeout**: Always use `timeout=60` for GUI commands. Commands return immediately when done; the timeout only caps maximum wait.
 
 ```bash
-source ~/gui-actor-env/bin/activate
+source ~/gui-agent-env/bin/activate
 cd ~/.openclaw/workspace/skills/gui-agent
 
 # Observe
@@ -225,7 +225,7 @@ Report is mostly automatic (detect_all auto-starts tracker, functions auto-tick 
 At the END of a GUI task, run this one command to generate and save the report:
 
 ```bash
-source ~/gui-actor-env/bin/activate
+source ~/gui-agent-env/bin/activate
 python3 ~/.openclaw/workspace/skills/gui-agent/skills/gui-report/scripts/tracker.py report
 ```
 
@@ -314,6 +314,5 @@ gui-agent/
 │   │           ├── united.com/
 │   │           ├── delta.com/
 │   │           └── ...
-│   └── meta_workflows/
 └── README.md
 ```

@@ -23,13 +23,20 @@ Add to `~/.openclaw/openclaw.json` (or use `openclaw config`):
 {
   "tools": {
     "exec": {
-      "timeoutSec": 60
+      "timeoutSec": 300
+    }
+  },
+  "messages": {
+    "queue": {
+      "mode": "interrupt"
     }
   }
 }
 ```
 
-**Why**: GUIClaw operations (screenshot → detect → click → wait) often take 15-30 seconds. The default exec timeout is too short and will kill commands mid-execution with SIGTERM.
+**Why `timeoutSec: 300`**: GUIClaw operation chains (screenshot → detect → click → wait → verify) can take a while. A 5-minute timeout is recommended. The default is too short and will kill commands mid-execution with SIGTERM.
+
+**Why `queue.mode: "interrupt"`**: GUI operations take time. Interrupt mode lets you send any message to immediately abort the current agent operation.
 
 ## Scripts
 
