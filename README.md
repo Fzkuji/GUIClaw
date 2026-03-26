@@ -12,7 +12,7 @@
   <p>
     <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick_Start-blue?style=for-the-badge" /></a>
     <a href="https://github.com/openclaw/openclaw"><img src="https://img.shields.io/badge/OpenClaw-Required-red?style=for-the-badge" /></a>
-    <a href="https://discord.gg/BQbUmVuD"><img src="https://img.shields.io/badge/Discord-7289da?style=for-the-badge&logo=discord&logoColor=white" /></a>
+    <a href="https://discord.gg/vfyqn5jWQy"><img src="https://img.shields.io/badge/Discord-7289da?style=for-the-badge&logo=discord&logoColor=white" /></a>
   </p>
 
   <p>
@@ -448,7 +448,7 @@ GUI-Agent-Skills/
 |---|---|
 | 🦞 **[OpenClaw](https://github.com/openclaw/openclaw)** | AI assistant framework — loads GUI Agent Skills as a skill |
 | 🔍 **[GPA-GUI-Detector](https://huggingface.co/Salesforce/GPA-GUI-Detector)** | Salesforce/GPA-GUI-Detector — general-purpose UI element detection model |
-| 💬 **[Discord Community](https://discord.gg/BQbUmVuD)** | Get help, share feedback |
+| 💬 **[Discord Community](https://discord.gg/vfyqn5jWQy)** | Get help, share feedback |
 
 ## 📄 License
 
