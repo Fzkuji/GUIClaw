@@ -104,10 +104,16 @@ export default definePluginEntry({
   register(api) {
     const verbose = api.pluginConfig?.verbose ?? false;
     
-    api.on("before_prompt_build", async () => {
+    api.on("before_prompt_build", async ({ prompt, messages }) => {
+      // Only inject if gui-agent skill is loaded (available in prompt)
+      const hasGuiSkill = prompt && /gui-agent/i.test(prompt);
+      if (!hasGuiSkill) {
+        return {};  // No GUI skill loaded → don't inject platform context
+      }
+      
       const platformInfo = detectPlatform();
       const context = generateContext(platformInfo, verbose);
-      api.logger.debug(`GUI Platform: ${platformInfo.platform} (${platformInfo.arch})`);
+      api.logger.debug(`GUI Platform: ${platformInfo.platform} (${platformInfo.arch}) — injecting context`);
       return { prependSystemContext: context };
     });
     
