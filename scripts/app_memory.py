@@ -2119,6 +2119,14 @@ def learn_from_screenshot(img_path, domain=None, app_name="chromium", page_name=
     if current_state_id:
         print(f"  📊 State: {current_state_id}")
     print(f"  📁 {save_dir}")
+
+    # Output tips from meta if available (app-specific experience)
+    tips = meta.get("tips", [])
+    if tips:
+        print(f"  📝 Tips for {app_name}:")
+        for tip in tips:
+            print(f"    • {tip}")
+
     return {"saved": len(page_components), "new": new_count, "components": page_components}
 
 
