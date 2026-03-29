@@ -285,3 +285,30 @@ $TRACKER report --context 120000
 ```
 
 See `gui-report/SKILL.md` for details.
+
+## ⛔ ABSOLUTE RULES — Coordinate Sources
+
+```
+✅ ALLOWED coordinate sources:
+   1. GPA-GUI-Detector (detect_icons) → bounding box center
+   2. OCR (detect_text) → text bounding box center
+   3. Template matching → saved component position
+
+❌ FORBIDDEN:
+   - LLM/vision model guessing coordinates
+   - Hardcoded pixel positions from memory or documentation
+   - Coordinates from image tool analysis (image tool = understanding ONLY)
+```
+
+Every click: screenshot → detect → get coordinates from detection → click. No exceptions.
+
+## Key Principles
+
+1. **Vision-driven** — screenshot → detect → match → click
+2. **Coordinates from detection only** — image tool is for understanding, NOT coordinates
+3. **Not found = not on screen** — re-learn, don't guess
+4. **State graph drives navigation** — each click records a transition
+5. **First time: screenshot + image. Repeat: detection only** — saves tokens
+6. **Paste > Type** for CJK text
+7. **Integer logical coordinates** — use detect_to_click() for Retina
+8. **ALWAYS save to memory** — every GUI operation saves to memory/apps/
