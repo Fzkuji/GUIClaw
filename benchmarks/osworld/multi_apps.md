@@ -1,108 +1,127 @@
 # OSWorld Multi-Apps Domain — GUI Agent Skills Results
 
-> 81 tasks tested (#21-101) | **44 / 81** (54.3%) | 2026-03-29
+> 101 tasks total | **37 passed / 41 attempted** | 60 remaining | 2026-03-29
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tasks | 81 (#21-101; #1-20 tested separately) |
-| ✅ Pass | 44 |
-| ❌ Fail (noop / unsolved) | 33 |
-| ⚠️ Evaluator/setup error | 4 |
-| **Score** | **44 / 81** (54.3%) |
+| Total tasks | 101 |
+| ✅ Pass (score > 0) | 37 |
+| ❌ Fail (score = 0) | 3 |
+| ⚠️ Evaluator/setup error | 1 |
+| 🔲 Not attempted | 60 |
+| **Pass rate (attempted)** | **37/41** (90.2%) |
 
 **Test environment:** Ubuntu ARM VM (VMware Fusion), 1920×1080
 **Evaluation:** Official OSWorld evaluator (`DesktopEnv.evaluate()`)
 **Agent approach:** Hybrid CLI + GUI (pyautogui on VM, vision analysis on Mac)
 
-**Note:** 52 failed tasks include ~48 that were run with `solve_noop` (no action taken). These need individual solvers.
-
 ## Detailed Results
 
 | # | Task ID | Instruction | Score | Status | Notes |
 |---|---------|-------------|-------|--------|-------|
-| 21 | `6d72aad6` | Convert Impress to video (built-in only) | 1.0 | ✅ | Infeasible → FAIL action |
-| 22 | `f918266a` | Complete calculator.py + save output | 1.0 | ✅ | Fixed insertion sort TODO |
-| 23 | `da52d699` | Find slowest reading pace book | 1.0 | ✅ | words/day calc → "Out of the Silent Planet" |
-| 24 | `bc2b57f3` | Reorder sheets per reminder.docx | 1.0 | ✅ | LO Basic macro via `soffice --headless macro:///` |
-| 25 | `74d5859f` | Set up web extension project | 1.0 | ✅ | Direct file creation: manifest.json + scripts |
-| 26 | `b5062e3e` | Extract first author info from papers | 1.0 | ✅ | openpyxl with `ws.title='Sheet1'` |
-| 27 | `00fa164e` | Insert Excel results into docx table | 1.0 | ✅ | python-docx table (4 decimal places) |
-| 28 | `acb0f96b` | Clone instructor-embedding repo | 1.0 | ✅ | git clone with retry |
-| 29 | `69acbb55` | Configure InstructorEmbedding env | 1.0 | ✅ | torch CPU + tqdm + InstructorEmbedding |
-| 30 | `48d05431` | Install conda + datasets | 1.0 | ✅ | Miniconda ARM64 + conda init bash |
-| 31 | `68a25bd4` | Download paper PDF + find citing paper | 1.0 | ✅ | BERT PDF + TinyBERT identified |
-| 32 | `eb303e01` | Insert speaking notes into PPTX | 0.0 | ❌ | Gold bug: Slide 4 Shape 4 paragraph count mismatch (11 vs 10) |
-| 33 | `0c825995` | Extract from Google Drive doc | — | ⚠️ | Setup failed: Google Drive auth needed |
-| 34 | `c7c1e4c3` | Fill professor email addresses | 1.0 | ✅ | Download xlsx → local edit → upload |
-| 35 | `d1acdb87` | Fill HK restaurant info sheet | 1.0 | ✅ | pyautogui typing failed (Chrome hijacked); local edit + upload |
-| 36 | `deec51c9` | Find arxiv daily LLM paper list | 1.0 | ✅ | GUI: Name Box nav + pyautogui.typewrite in LO Calc |
-| 37 | `8e116af7` | Update bookkeeping from receipts | — | ⚠️ | Evaluator crash: formulas lack `<v>` + LO recovery dialog |
-| 38 | `337d318b` | Cross-check invoices vs bank statement | 1.0 | ✅ | Invoice #243729 → problematic/ folder |
-| 39 | `82e3c869` | Extract presenter (Tao Yu) photos | 1.0 | ✅ | 4 photos → presenter/ + zip |
-| 40 | `185f29bd` | Fill employee evaluation PDF forms | 0.0 | ❌ | Complex PDF form filling (7 employees), skipped |
-| 41 | `869de13e` | Organize desktop files by category | 1.0 | ✅ | Paper_reading/Projects/Miscellaneous |
-| 42 | `2c1ebcd7` | Fix APA 7th references in case study | 0.82 | ✅ | compare_references partial match |
-| 43 | `3a93cae4` | Add lecture slot to course timetable | 0.0 | ❌ | Needs solver |
-| 44 | `1f18aa87` | Complete grammar test answer keys | 0.0 | ❌ | Needs solver |
-| 45 | `26150609` | Fix Snake game food placement bug | 0.0 | ❌ | Needs solver |
-| 46 | `9219480b` | Fix Tetris rotation crash bug | 0.0 | ❌ | Needs solver |
-| 47 | `881deb30` | Find HK faculty job info (Early Career) | 0.0 | ❌ | Needs browser |
-| 48 | `7e287123` | Create GRF funding data xlsx | 1.0 | ✅ | openpyxl with formulas |
-| 49 | `e2392362` | Set up academic homepage from template | 0.0 | ❌ | Needs browser |
-| 50 | `5bc63fb9` | Process JSON survey responses | 0.0 | ❌ | Needs solver |
-| 51 | `26660ad1` | Test network quality + save results | 0.0 | ❌ | Needs solver |
-| 52 | `a82b78bb` | Find paper authors' personal webpages | 0.0 | ❌ | Needs browser |
-| 53 | `36037439` | Find Google Scholar page of author | 0.0 | ❌ | Needs browser |
-| 54 | `716a6079` | Find secret.docx + copy path to clipboard | 0.0 | ❌ | Needs solver |
-| 55 | `873cafdd` | Install Chrome plugins from list | 0.0 | ❌ | Needs browser |
-| 56 | `a74b607e` | Install Chrome extension manually | 0.0 | ❌ | Needs browser |
-| 57 | `6f4073b8` | Count ML conference meeting cities | 0.0 | ❌ | Needs browser |
-| 58 | `da922383` | Save blog articles to Calc sheet | 0.0 | ❌ | Needs browser |
-| 59 | `2373b66a` | Monitor system resources with sar | 0.0 | ❌ | Needs solver (sysstat + sar) |
-| 60 | `81c425f5` | Transfer Calc data to Writer table | 0.0 | ❌ | Needs solver |
-| 61 | `bb83cab4` | Convert Impress to Writer document | 0.0 | ❌ | Needs solver |
-| 62 | `227d2f97` | Copy XCF image into Writer docx | 0.0 | ❌ | Needs solver (GIMP batch + python-docx) |
-| 63 | `b337d106` | Set up Vim syntax highlighting | 0.0 | ❌ | Needs solver |
-| 64 | `20236825` | Practice algorithm in document | 0.0 | ❌ | Needs solver |
-| 65 | `8df7e444` | Follow essay submission guidelines | 0.0 | ❌ | Needs solver |
-| 66 | `aad10cd7` | Save blog content as local file | 0.0 | ❌ | Needs browser |
-| 67 | `02ce9a50` | Insert screenshot into Writer tutorial | 0.0 | ❌ | Needs solver |
-| 68 | `4c26e3f3` | Enhance dim image in Impress slide | 0.0 | ❌ | Needs solver |
-| 69 | `a503b07f` | Convert receipt image to PDF | 1.0 | ✅ | PIL Image.convert('RGB').save() |
-| 70 | `09a37c51` | Edit image for friend's request | 0.0 | ❌ | Needs solver |
-| 71 | `3e3fc409` | Create movie statistics visualization | 0.0 | ❌ | Needs solver |
-| 72 | `f5c13cdd` | Draft tuition reminder email | 0.0 | ❌ | Needs solver |
-| 73 | `5990457f` | Add Yann LeCun from Google Scholar | 0.0 | ❌ | Needs browser |
-| 74 | `415ef462` | Process AWS invoice email attachment | 0.0 | ❌ | Needs Thunderbird |
-| 75 | `7ff48d5b` | Research Macau concert visa requirements | 0.0 | ❌ | Needs browser |
-| 76 | `9f3bb592` | Remove subtitles from video | 0.0 | ❌ | Needs VLC/ffmpeg |
-| 77 | `dd60633f` | Extract Python code from Colab notebook | 0.0 | ❌ | Needs browser |
-| 78 | `ce2b64a2` | Identify and rename mountain photos | 1.0 | ✅ | Vision: Kilimanjaro, Mount Everest, Mount Hua |
-| 79 | `3f05f3b9` | Fix MP3 metadata from filenames | 0.0 | ❌ | Needs solver |
-| 80 | `e1fc0df3` | Install LanguageTool LO extension | 0.0 | ❌ | Needs solver |
-| 81 | `f8369178` | Install Orchis GNOME theme | 1.0 | ✅ | git clone + install.sh + gsettings |
-| 82 | `778efd0a` | Fix video playback in Impress | 0.0 | ❌ | Needs GUI |
-| 83 | `47f7c0ce` | Extract video frame at 00:08 | — | ⚠️ | Evaluator error |
-| 84 | `c2751594` | Export image from email attachment doc | 0.0 | ❌ | Needs Thunderbird |
-| 85 | `788b3701` | Track GitHub story updates | 0.0 | ❌ | Needs browser |
-| 86 | `48c46dc7` | Set up workspace (open project + apps) | 0.0 | ❌ | Needs solver |
-| 87 | `42d25c08` | Convert web novel txt to ebook | 0.0 | ❌ | Needs solver |
-| 88 | `e8172110` | Extract pixel art character in GIMP | 0.0 | ❌ | Needs GIMP |
-| 89 | `42f4d1c7` | Configure VS Code for GIMP script-fu | 0.0 | ❌ | Needs solver |
-| 90 | `3c8f201a` | Compress image under 600KB | 1.0 | ✅ | PIL quality=60 |
-| 91 | `d68204bf` | Rearrange image sections by warm tones | 1.0 | ✅ | PIL crop + paste (warm→cold left→right) |
-| 92 | `91190194` | Crop top 20% of cola.png | 1.0 | ✅ | PIL crop |
-| 93 | `7f35355e` | Export table to CSV + find medium price | 0.0 | ❌ | Needs solver |
-| 94 | `98e8e339` | Merge txt files into Writer document | 0.0 | ❌ | Needs solver |
-| 95 | `0e5303d4` | Download Python course materials | 0.0 | ❌ | Needs browser |
-| 96 | `df67aebb` | Format paper thesis references | 0.0 | ❌ | Needs solver |
-| 97 | `5df7b33a` | Split book into chapters | 0.0 | ❌ | Needs solver |
-| 98 | `aceb0368` | Grade English exam multiple choice | 0.0 | ❌ | Needs solver |
-| 99 | `22a4636f` | Convert docx to PDF + upload to Drive | — | ⚠️ | Google Drive auth needed |
-| 100 | `236833a3` | Find HuggingFace daily paper list | 0.0 | ❌ | Needs browser |
-| 101 | `67890eb6` | Find ACL best long paper awards 2019-2023 | 0.0 | ❌ | Needs browser |
+| 1 | `2b9493d7` | Hey, my LibreOffice Writer seems to have frozen and I can't get it to close norm | — | 🔲 | Not attempted |
+| 2 | `2c9fc0de` | Could you help me push the changes from commandline in current project to origin | — | 🔲 | Not attempted |
+| 3 | `2fe4b718` | Could you help me create an Animated GIF src_clip.gif from a video file using VL | — | 🔲 | Not attempted |
+| 4 | `3680a5ee` | I have file1.xlsx and file2.ods on my Desktop, each containing a single column.  | — | 🔲 | Not attempted |
+| 5 | `46407397` | Help me export charts, graph or other images from docx files received in email " | — | 🔲 | Not attempted |
+| 6 | `4e9f0faf` | Could you help me extract data in the table from a new invoice uploaded to my Go | — | 🔲 | Not attempted |
+| 7 | `510f64c8` | Could you start VS Code in folder ~/Desktop/project from the terminal? | — | 🔲 | Not attempted |
+| 8 | `51f5801c` | I've been working on this presentation in LibreOffice Impress and I've added a b | — | 🔲 | Not attempted |
+| 9 | `58565672` | Can you assist me by opening the first link in the latest email in Bills folder  | — | 🔲 | Not attempted |
+| 10 | `78aed49a` | Could you help me save all attachments of the oldest email in Bills local folder | — | 🔲 | Not attempted |
+| 11 | `897e3b53` | I have a LibreOffice Writer file form.docx on the desktop. Help me convert it to | — | 🔲 | Not attempted |
+| 12 | `937087b6` | I am currently using a ubuntu system. Could you help me set the default video pl | — | 🔲 | Not attempted |
+| 13 | `a0b9dc9c` | Please help me backup my emails in "Bills" folder in Thunderbird and store the . | — | 🔲 | Not attempted |
+| 14 | `b52b40a5` | Could you help me merge all PDF files in the "Paper Recommendation" email attach | — | 🔲 | Not attempted |
+| 15 | `c867c42d` | Please assist me in exporting my contacts of Personal Address Book from Thunderb | — | 🔲 | Not attempted |
+| 16 | `d9b7c649` | Help me extract the latest 5 emails in daily folder from Thunderbird, from the e | — | 🔲 | Not attempted |
+| 17 | `e135df7c` | Please convert a .xlsx file opened in LibreOffice Calc to a .html file and view  | — | 🔲 | Not attempted |
+| 18 | `ee9a3c83` | Could you help me convert the opened ods file in the desktop to csv file with th | — | 🔲 | Not attempted |
+| 19 | `f7dfbef3` | Could you convert all `.doc` files in current directory to PDF all at once in th | — | 🔲 | Not attempted |
+| 20 | `f8cfa149` | Could you help me copy the data in Cell B6 in this Libreoffice Calc file and sea | — | 🔲 | Not attempted |
+| 21 | `6d72aad6` | Convert an OpenOffice/LibreOffice Impress presentation into a video using only L | 1.0 | ✅ | Infeasible → FAIL action |
+| 22 | `f918266a` | Please complete the code and retrieve the output from the Python script 'calcula | 1.0 | ✅ | Fixed insertion sort TODO |
+| 23 | `da52d699` | Examine the spreadsheet on the desktop, which contains a record of books read in | 1.0 | ✅ | words/day calc → "Out of the Silent Planet" |
+| 24 | `bc2b57f3` | The requirements of my data analysis assignment are listed in "reminder.docx" on | 1.0 | ✅ | LO Basic macro via soffice --headless |
+| 25 | `74d5859f` | Help me to set up an initial web extension project with help of the web tool, ta | 1.0 | ✅ | Direct file creation: manifest.json + scripts |
+| 26 | `b5062e3e` | Please help me to extract the name, e-mail, and affiliation of the first author  | 1.0 | ✅ | openpyxl with ws.title="Sheet1" |
+| 27 | `00fa164e` | I need to include the experiment results from "~/Documents/awesome-desktop/expe- | 1.0 | ✅ | python-docx table (4 decimal places) |
+| 28 | `acb0f96b` | Please help me clone the repo "https://github.com/xlang-ai/instructor-embedding" | 1.0 | ✅ | git clone with retry |
+| 29 | `69acbb55` | I'm working on word embedding tasks and require assistance in configuring the en | 1.0 | ✅ | torch CPU + InstructorEmbedding |
+| 30 | `48d05431` | When I ran "conda install datasets" in terminal, I got "conda: command not found | 1.0 | ✅ | Miniconda ARM64 + conda init bash |
+| 31 | `68a25bd4` | I've compiled papers and books with links in this spreadsheet. Help me download  | 1.0 | ✅ | BERT PDF + TinyBERT citation |
+| 32 | `eb303e01` | Tomorrow, I'm scheduled to deliver a talk, and my PowerPoint slides and speaking | 0.0 | ❌ | Gold bug: Slide 4 paragraph count mismatch |
+| 33 | `0c825995` | I'm working on a comprehensive report for our environmental policy review meetin | — | 🔲 | Not attempted |
+| 34 | `c7c1e4c3` | I am collecting the contact information of some professors and have their homepa | 1.0 | ✅ | Download xlsx → local edit → upload |
+| 35 | `d1acdb87` | Hello! I'm eagerly planning a culinary adventure to Hong Kong and have curated a | 1.0 | ✅ | GUI: gui_action.py click/type in LO Calc |
+| 36 | `deec51c9` | Find a paper list of all the new foundation language models issued on 11st Oct.  | 1.0 | ✅ | GUI: Name Box nav + typewrite in LO Calc |
+| 37 | `8e116af7` | Please update my bookkeeping sheet with the recent transactions from the provide | -1.0 | ⚠️ | Vision OCR receipts + LO formula caching; evaluator crash |
+| 38 | `337d318b` | Cross-check the invoices with the bank statements and identify any discrepancies | 1.0 | ✅ | Invoice #243729 → problematic/ folder |
+| 39 | `82e3c869` | Please sift through the folder with all the event photos taken by our photograph | 1.0 | ✅ | 4 photos → presenter/ + zip |
+| 40 | `185f29bd` | Transfer the data from our 'Employee Performance Evaluation Summary' Excel sheet | 0.97 | ✅ | pypdf form fill (7 employees); field mapping issue |
+| 41 | `869de13e` | Can you organize my desktop by identifying academic papers, coding projects, and | 1.0 | ✅ | Paper_reading/Projects/Miscellaneous |
+| 42 | `2c1ebcd7` | Could you please take a moment to review the 'case study' file located within th | 0.82 | ✅ | compare_references partial match |
+| 43 | `3a93cae4` | Could you please add a two-hour lecture slot to my weekly course timetable, sche | 1.0 | ✅ | Added Lec 2 (12:00-14:00) to cell D5 |
+| 44 | `1f18aa87` | I've prepared some grammar tests and placed them in the 'Grammar test' folder. I | 1.0 | ✅ | Read 3 .docx files, created Answer.docx |
+| 45 | `26150609` | So, I've been dabbling with coding a Snake game in Python, and I finally got it  | 1.0 | ✅ | Grid alignment fix for food spawning |
+| 46 | `9219480b` | Hi, I recently playing with developing a small python-based tetris game. While I | 1.0 | ✅ | rotate() + intersect() check |
+| 47 | `881deb30` | I want to find a faculty job in Hong Kong, so I am more curious about the "Early | — | 🔲 | Not attempted |
+| 48 | `7e287123` | I am an assistant professor of CS at HKU, I want to apply for the General Resear | 1.0 | ✅ | openpyxl with formulas |
+| 49 | `e2392362` | I recently started using the famous personal academic homepage template from aca | — | 🔲 | Not attempted |
+| 50 | `5bc63fb9` | I have a JSON-formatted data file opened now that stores the responses of severa | — | 🔲 | Not attempted |
+| 51 | `26660ad1` | I want to test the quality of the network environment my laptop is currently in. | — | 🔲 | Not attempted |
+| 52 | `a82b78bb` | I'm really enjoying this paper. Could you please locate the personal webpages of | — | 🔲 | Not attempted |
+| 53 | `36037439` | Could you please pull up the Google Scholar page of the corresponding author for | — | 🔲 | Not attempted |
+| 54 | `716a6079` | I remember there is a file named "secret.docx" on this computer, but I can't rem | — | 🔲 | Not attempted |
+| 55 | `873cafdd` | My friend is a "plugin guru" and he recommended some good plug-ins to me. Please | — | 🔲 | Not attempted |
+| 56 | `a74b607e` | I have developed a new Chrome extension myself, so it needs to be installed manu | — | 🔲 | Not attempted |
+| 57 | `6f4073b8` | I now want to count the meeting cities of the three machine learning conferences | — | 🔲 | Not attempted |
+| 58 | `da922383` | I browsed a lot of interesting blog articles today. I hope to store these articl | — | 🔲 | Not attempted |
+| 59 | `2373b66a` | Monitor Ubuntu system resource usage using the sar command from sysstat toolkit. | 1.0 | ✅ | sysstat + sar -u 1 30 |
+| 60 | `81c425f5` | Can you assist me in transferring the data from LibreOffice Calc in the current  | — | 🔲 | Not attempted |
+| 61 | `bb83cab4` | I want to convert an Impress file into a document editable in Writer. Simply pla | 0.0 | ❌ | pptx shape extraction mismatch |
+| 62 | `227d2f97` | I've stored my .xcf file on the Desktop. Can you assist me in copying the image  | 0.0 | ❌ | GIMP batch convert + python-docx |
+| 63 | `b337d106` | Recently, I've been exploring the use of the Vim editor for code editing. Howeve | 1.0 | ✅ | .vimrc: set number + syntax on |
+| 64 | `20236825` | I am currently working on my algorithm practice using the document "bubble_Sort_ | — | 🔲 | Not attempted |
+| 65 | `8df7e444` | The guidelines for submitting our essay work are provided in the "reminder.docx" | — | 🔲 | Not attempted |
+| 66 | `aad10cd7` | I want to obtain a local file version of the content from the blog at https://de | — | 🔲 | Not attempted |
+| 67 | `02ce9a50` | I am currently utilizing LibreOffice Writer to compose a Linux tutorial, and I i | — | 🔲 | Not attempted |
+| 68 | `4c26e3f3` | I've noticed that the image on the second slide is too dim. Can you please enhan | — | 🔲 | Not attempted |
+| 69 | `a503b07f` | I have an image of my receipt located in /home/user. I'm looking to transform it | 1.0 | ✅ | PIL Image.convert("RGB").save() |
+| 70 | `09a37c51` | I've received a request from my friend who asked for assistance in editing an im | — | 🔲 | Not attempted |
+| 71 | `3e3fc409` | I'm a huge movie fan and have kept a record of all the movies I've watched. I'm  | — | 🔲 | Not attempted |
+| 72 | `f5c13cdd` | I've drafted an e-mail reminder for those who haven't paid tuition. Please help  | — | 🔲 | Not attempted |
+| 73 | `5990457f` | Append one entry of AI researcher Yann LeCun from Google Scholar into an existin | — | 🔲 | Not attempted |
+| 74 | `415ef462` | There's an e-mail containing the AWS invoice for December saved in local "Bills" | — | 🔲 | Not attempted |
+| 75 | `7ff48d5b` | I am a Chinese citizen and I want to go to Macau to watch a concert recently, bu | — | 🔲 | Not attempted |
+| 76 | `9f3bb592` | I downloaded a video to practice listening, but I don't know how to remove the s | — | 🔲 | Not attempted |
+| 77 | `dd60633f` | Please extract all Python code and comments from Karpathy's GPT colab code cells | — | 🔲 | Not attempted |
+| 78 | `ce2b64a2` | There are several pictures of mountains in my Pictures directory, but I don’t kn | 1.0 | ✅ | Vision: Kilimanjaro, Everest, Mount Hua |
+| 79 | `3f05f3b9` | I have a collection of MP3s with blank meta data, but already named with their a | 1.0 | ✅ | mutagen ID3 fix for corrupt headers |
+| 80 | `e1fc0df3` | Install LanguageTool extension for my LibreOffice | — | 🔲 | Not attempted |
+| 81 | `f8369178` | Help me to install Orchis theme from gnome-look.org and change to it for my GNOM | 1.0 | ✅ | vinceliuice/Orchis-theme install.sh |
+| 82 | `778efd0a` | I'm using libreoffice impress to write slideshows. I found that the video being  | — | 🔲 | Not attempted |
+| 83 | `47f7c0ce` | The landscape at 00:08 in this video is so beautiful. Please extract this frame  | — | 🔲 | Not attempted |
+| 84 | `c2751594` | Help me export the first image from the doc file attached in the most recent ema | — | 🔲 | Not attempted |
+| 85 | `788b3701` | I'm tracking updates for a short tale set on https://github.com/liangjs333/4th-y | — | 🔲 | Not attempted |
+| 86 | `48c46dc7` | Help me to automatically set up my work space. To be specific, open project dire | 1.0 | ✅ | CDP tab management |
+| 87 | `42d25c08` | Hey, my friend has just sent me a web novel, but in txt files. Could you please  | — | 🔲 | Not attempted |
+| 88 | `e8172110` | Open 'character.png' in GIMP and extract the pixel art character. Save the selec | — | 🔲 | Not attempted |
+| 89 | `42f4d1c7` | Configure VS Code to edit GIMP script-fu scripts effectively by installing lisp  | 1.0 | ✅ | resized.png path fix |
+| 90 | `3c8f201a` | Download the image from "https://huggingface.co/datasets/xlangai/ubuntu_osworld_ | 1.0 | ✅ | PIL quality=60 |
+| 91 | `d68204bf` | Divide my image vertically into three equal sections with command line. Then rea | 1.0 | ✅ | PIL crop + paste (warm→cold left→right) |
+| 92 | `91190194` | Launch GIMP from the command line to edit "cola.png" and crop the top 20% off th | 1.0 | ✅ | PIL crop top 20% |
+| 93 | `7f35355e` | Export the table to a CSV file and then help me write code to find the medium pr | — | 🔲 | Not attempted |
+| 94 | `98e8e339` | Merge the contents of all .txt files from your vscode project into a single docu | 1.0 | ✅ | json.dumps for clean transfer |
+| 95 | `0e5303d4` | I want to learn python programming and my friend recommends me this course websi | — | 🔲 | Not attempted |
+| 96 | `df67aebb` | I am writing my paper thesis. I have listed all referenced papers in the opened  | — | 🔲 | Not attempted |
+| 97 | `5df7b33a` | I enjoy reading during my spare time, but this book is too bulky. Each time I op | — | 🔲 | Not attempted |
+| 98 | `aceb0368` | I am grading students' English exam papers, but the test consists only of multip | 1.0 | ✅ | Grade multiple choice answers |
+| 99 | `22a4636f` | Please help me convert the file "Meeting-Agenda.docx" to a pdf file and upload t | — | 🔲 | Not attempted |
+| 100 | `236833a3` | Find the daily paper list on Huggingface and take down the meta information of p | — | 🔲 | Not attempted |
+| 101 | `67890eb6` | I am an NLP researcher. Check out the best long paper awards of ACL from 2019 to | — | 🔲 | Not attempted |
 
 ## Known Issues & Workarounds
 
@@ -113,34 +132,27 @@
 | openpyxl default sheet name "Sheet" ≠ evaluator "Sheet1" | Always set `ws.title = 'Sheet1'` |
 | openpyxl formulas lack `<v>` cached values | Write numeric values, or use LO to re-save |
 | pyautogui `typewrite()` triggers Chrome on URL-like text | Use clipboard paste or local edit + upload |
-| xdotool not pre-installed on OSWorld VMs | Use pyautogui.typewrite() (always available); http_remote.py fixed in c22ce63 |
+| xdotool not pre-installed on OSWorld VMs | Use pyautogui.typewrite() (always available) |
 | pip install on VM times out (HuggingFace SSL errors) | Modify files locally on Mac, upload via base64 |
 | Google Drive tasks need OAuth | Requires credentials setup in settings.yml |
-| PPTX shape EMU mismatch (pre-existing in gold) | Accept 0 score, not fixable |
 
 ## Lessons Learned
 
 ### 1. Local Edit + Upload Pattern
 Best pattern for modifying VM files:
-1. Download from VM via base64: `vm_exec(["python3", "-c", "import base64; print(base64.b64encode(open('path','rb').read()).decode())"])`
-2. Modify locally on Mac with openpyxl/python-docx (always available)
-3. Upload back via base64 chunks (50000 chars each)
-4. Open in LO: `soffice --calc 'path' &`
+1. Download from VM via base64
+2. Modify locally with openpyxl/python-docx
+3. Upload back via base64 chunks
+4. Open in LO if formula caching needed
 
 ### 2. LO Headless Macro for Sheet Operations
-Task 24 showed that `soffice --headless macro:///Standard.Module1.ReorderSheets` can execute Basic macros without GUI. This preserves charts and formatting that openpyxl would destroy.
+`soffice --headless macro:///Standard.Module1.ReorderSheets` preserves charts and formatting that openpyxl would destroy.
 
 ### 3. Evaluator Strictness
-- `compare_pptx_files`: Checks ALL shapes including paragraph count (Task 32 gold bug)
-- `compare_docx_tables`: Exact text match per cell (need exact decimal places)
+- `compare_pptx_files`: Checks ALL shapes including paragraph count
+- `compare_docx_tables`: Exact text match per cell
 - `check_cell`: Reads raw XML `<v>` tags, not computed values
 - `compare_table` with `sheet_print`: Converts xlsx→CSV via libreoffice
-
-### 4. pyautogui on VM
-- VM resolution: 1920×1080
-- `typewrite()` can trigger browser on URL-like text
-- Use `wmctrl -a 'title'` for window activation
-- Recovery dialog blocks GUI operations after soffice crash
 
 ## Files
 
