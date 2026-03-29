@@ -12,6 +12,7 @@ Output is formatted for direct injection into model context.
 
 import os
 import sys
+import shutil
 import argparse
 
 # Add parent dir to path for imports
@@ -50,6 +51,15 @@ def activate(remote_info=None):
         print(open(guide_path).read())
     else:
         print(f"⚠️ No platform guide found for: {info['platform_guide']}")
+    
+    # Copy platform-specific actions to _actions.yaml
+    platform_map = {"Darwin": "macos", "Linux": "linux"}
+    platform_key = platform_map.get(info['os'], info['os'].lower())
+    actions_src = os.path.join(base_dir, "actions", f"_actions_{platform_key}.yaml")
+    actions_dst = os.path.join(base_dir, "actions", "_actions.yaml")
+    if os.path.exists(actions_src):
+        shutil.copy2(actions_src, actions_dst)
+        print(f"\n✅ Actions: _actions_{platform_key}.yaml → _actions.yaml")
     
     # Remote target info (if provided)
     if remote_info:

@@ -1,0 +1,123 @@
+# Atomic Actions — Linux (X11)
+# These are shared by ALL scenes. They are the leaf nodes of any task decomposition.
+# When a scene step has no `ref:`, it uses one of these actions directly.
+#
+# Loading: Only read this file when you're about to EXECUTE an action.
+# Scene files tell you WHICH action to use; this file tells you HOW.
+
+actions:
+
+  # === Mouse ===
+  click:
+    desc: "Click at coordinates"
+    cmd: "pyautogui.click({x}, {y})"
+    alt_cmd: "xdotool mousemove {x} {y} click 1"
+    constraints:
+      - "Coordinates are logical pixels (1:1, no Retina scaling)"
+      - "Execute via VM HTTP API: POST /execute with python3 -c command"
+
+  double_click:
+    desc: "Double-click at coordinates"
+    cmd: "pyautogui.click({x}, {y}, clicks=2)"
+    alt_cmd: "xdotool mousemove {x} {y} click --repeat 2 1"
+
+  right_click:
+    desc: "Right-click at coordinates"
+    cmd: "pyautogui.click({x}, {y}, button='right')"
+    alt_cmd: "xdotool mousemove {x} {y} click 3"
+
+  # === Keyboard ===
+  type:
+    desc: "Type text (supports special characters)"
+    cmd: 'xdotool type --delay 10 "{text}"'
+    constraints:
+      - "Preferred over pyautogui.typewrite (handles special chars: / : @ etc.)"
+      - "Use --delay 10 for reliability (ms between keystrokes)"
+      - "For very long text, consider chunking"
+
+  paste:
+    desc: "Paste via clipboard"
+    cmd: 'echo -n "{text}" | xclip -selection clipboard && xdotool key ctrl+v'
+    constraints:
+      - "xclip paste is UNRELIABLE in LibreOffice — prefer xdotool type instead"
+      - "Sends to CURRENT FOCUS — verify focus before calling"
+
+  press_key:
+    desc: "Press a special key (Return, Escape, Tab, etc.)"
+    cmd: "xdotool key {key}"
+    values: [Return, Escape, Tab, Delete, space, Up, Down, Left, Right, Home, End]
+    alt_cmd: "pyautogui.press('{key}')"
+    alt_values: [enter, escape, tab, delete, space, up, down, left, right, home, end]
+
+  shortcut:
+    desc: "Keyboard shortcut (Ctrl+S, Ctrl+Shift+C, etc.)"
+    cmd: "xdotool key {keys}"
+    examples:
+      - "xdotool key ctrl+s        # Save"
+      - "xdotool key ctrl+w        # Close window/tab"
+      - "xdotool key ctrl+q        # Quit app"
+      - "xdotool key ctrl+z        # Undo"
+      - "xdotool key ctrl+a        # Select all"
+      - "xdotool key ctrl+shift+t  # Reopen tab"
+      - "xdotool key alt+F4        # Close window"
+    alt_cmd: "pyautogui.hotkey('{mod}', '{key}')"
+
+  # === Observation ===
+  screenshot:
+    desc: "Capture screen to image file"
+    cmd: "pyautogui.screenshot('{path}')"
+    alt_cmd: "scrot '{path}'"
+    constraints:
+      - "For remote VMs: GET http://{vm_ip}:5000/screenshot"
+      - "Download to host for OCR analysis"
+
+  ocr_find:
+    desc: "Find text on screen with coordinates"
+    cmd: "detect_text('{screenshot_path}')"
+    constraints:
+      - "Run on HOST machine (macOS) — download screenshot first"
+      - "Returns: [{label, cx, cy, x, y, w, h}, ...]"
+
+  # === Window Management ===
+  focus_app:
+    desc: "Bring a window to foreground"
+    cmd: 'wmctrl -a "{title}"'
+    constraints:
+      - "Matches partial window title"
+      - "Alternative: xdotool search --name '{title}' windowactivate"
+
+  close_window:
+    desc: "Close a window by title"
+    cmd: 'wmctrl -c "{title}"'
+
+  list_windows:
+    desc: "List all open windows"
+    cmd: "wmctrl -l"
+    returns: "Window ID, desktop, hostname, title"
+
+  # === App Control ===
+  open_app:
+    desc: "Launch an application"
+    cmd: "{app_command} &"
+    examples:
+      - "soffice --calc 'file.xlsx' &"
+      - "soffice --writer 'file.docx' &"
+      - "soffice --impress 'file.pptx' &"
+      - "chromium --remote-debugging-port=1337 &"
+      - "nautilus /path/to/dir &"
+      - "gnome-terminal -- bash -c 'cd /path && exec bash' &"
+      - "code /path/to/project &"
+
+  quit_app:
+    desc: "Quit an application"
+    cmd: "xdotool key ctrl+q"
+    alt_cmd: "pkill -f '{process_name}'"
+    constraints:
+      - "Prefer Ctrl+Q or Ctrl+W over pkill"
+      - "pkill causes Document Recovery dialog in LibreOffice"
+
+  # === Timing ===
+  wait:
+    desc: "Sleep for N seconds"
+    cmd: "sleep {seconds}"
+    alt_cmd: "time.sleep({seconds})"
