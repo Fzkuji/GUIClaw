@@ -26,11 +26,16 @@
 - #15: Activities → terminal → type python3 export script
 - #18: Activities search → click Terminal → type conversion command (but command went into Calc cell multiple times due to window focus issues)
 - #19: Activities → terminal → type `libreoffice --headless --convert-to pdf *.doc` (failed, had to use VM exec API)
-- #20: search query opened via CDP (no GUI clicking in Chrome)
+- #20: pyautogui Name Box→B6→Ctrl+C → wmctrl switch Chrome → Ctrl+T → typewrite google.com/search?q=Nereida
+- #22: gnome-terminal launched via API → wmctrl focus → pyautogui typewrite `python3 /tmp/fix22.py` (fixes insertion sort TODO + saves log.txt)
+- #23: gnome-terminal → wmctrl → pyautogui typewrite `python3 /tmp/analysis23.py` (openpyxl read spreadsheet → python-docx write answer)
+- #24: gnome-terminal → wmctrl → pyautogui typewrite `python3 /tmp/reorder24.py` (openpyxl move_sheet reorder)
 - #86: gnome-terminal + nautilus + chromium launched via VM exec API, not GUI clicking
 
+**Note on #22-#24 GUI approach**: These use pyautogui to type commands in a visible gnome-terminal window (launched via API, focused via wmctrl). The actual computation is done by python scripts. GUI interaction = "typing in terminal window on screen", not native app menu/button clicking.
+
 **Tasks solved via CLI/API only** (no GUI skills — just VM exec API):
-- #16, #17, #21, #22, #23, #24, #26, #27, #31, #32, #41, #63
+- #16, #17, #21, #26, #27, #31, #32, #41, #63
 
 **Tasks where setup was done but NO actual work attempted** (59 tasks):
 - #37-40, #42-50, #51-53, #55-62, #64-76, #78-85, #87-98, #100-101
