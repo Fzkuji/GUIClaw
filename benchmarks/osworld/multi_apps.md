@@ -7,10 +7,10 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 101 |
-| ✅ Actually solved (any method) | 34 |
-| 🔲 Only setup, no actual work | 47 |
+| ✅ Actually solved (any method) | 53 |
+| 🔲 Only setup, no actual work | 28 |
 | ❌ Blocked (Google Drive/network) | 20 |
-| **True pass rate** | **34/101** (33.7%) |
+| **True pass rate** | **53/101** (52.5%) |
 
 ### 2026-03-31 Session — GUI Re-runs & New Tasks
 
