@@ -1,17 +1,17 @@
 # OSWorld Multi-Apps Domain — GUI Agent Skills Results
 
-> 101 tasks total | Last updated: 2026-04-01 15:08 HKT
+> 101 tasks total | Last updated: 2026-04-01 15:22 HKT
 
 ## Current Status
 
 | Metric | Value |
 |--------|-------|
 | Total tasks | 101 |
-| ✅ Verified (official eval) | 2 |
-| ⏳ Pending eval | 61 |
+| ✅ Verified (official eval) | 3 |
+| ⏳ Pending eval | 60 |
 | ❌ Blocked | 20 |
 | 🔲 Not yet attempted | 18 |
-| **Verified score** | **2/2 = 100%** |
+| **Verified score** | **2.845/3 = 94.8%** |
 
 > Scores are ONLY from OSWorld official evaluator (`desktop_env/evaluators/`).
 
@@ -21,7 +21,7 @@
 |---|---------|------------------------|-------|-------|
 | 1 | `2b9493d7` | Force quit LibreOffice Writer | **1.0** | screenshot → detect → click terminal → type killall |
 | 2 | `2c9fc0de` | Push git changes | **1.0** | click terminal → type git add/commit/push |
-| 3 | `2fe4b718` | Create animated GIF from video | | |
+| 3 | `2fe4b718` | Create animated GIF from video | **0.845** | ffmpeg -ss 3 -t 5, fps=2, palettegen |
 | 4 | `3680a5ee` | Merge xlsx/ods columns to CSV | | |
 | 5 | `46407397` | Export charts from docx | | |
 | 6 | `4e9f0faf` | Extract invoice table | | |
