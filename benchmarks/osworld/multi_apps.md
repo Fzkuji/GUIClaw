@@ -1,17 +1,17 @@
 # OSWorld Multi-Apps Domain — GUI Agent Skills Results
 
-> 101 tasks total | Last updated: 2026-04-01 23:15 HKT
+> 101 tasks total | Last updated: 2026-04-01 23:35 HKT
 
 ## Current Status
 
 | Metric | Value |
 |--------|-------|
 | Total tasks | 101 |
-| ✅ Verified (official eval) | 23 |
-| ⏳ Pending eval | 40 |
+| ✅ Verified (official eval) | 24 |
+| ⏳ Pending eval | 39 |
 | ❌ Blocked | 20 |
 | 🔲 Not yet attempted | 18 |
-| **Verified score** | **17.443/23 = 75.8%** |
+| **Verified score** | **18.443/24 = 76.8%** |
 
 > Scores are ONLY from OSWorld official evaluator (`desktop_env/evaluators/`).
 
@@ -48,7 +48,7 @@
 | 27 | `00fa164e` | Insert GPT-4 results table | **1.0** | 从xlsx提取GPT-4行数据(4位小数)，python-docx插入表格到docx的Main Results节 |
 | 28 | `acb0f96b` | Clone GitHub repo | **1.0** | git clone xlang-ai/instructor-embedding到~/，ls -R完全匹配gold |
 | 29 | `69acbb55` | Configure word embeddings | **1.0** | git clone + pip install -e . + pip install -r requirements.txt，import成功无Error |
-| 30 | `48d05431` | Install conda | | |
+| 30 | `48d05431` | Install conda | **1.0** | 下载Miniconda3-aarch64安装+conda init bash，bashrc含conda initialize |
 | 31 | `68a25bd4` | Download paper + find citation | | |
 | 32 | `eb303e01` | Insert speaker notes to PPTX | | |
 | 33 | `0c825995` | Environmental policy report | | |
