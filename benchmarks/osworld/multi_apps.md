@@ -7,11 +7,11 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 101 |
-| ✅ Verified (official eval) | 6 |
-| ⏳ Pending eval | 57 |
+| ✅ Verified (official eval) | 8 |
+| ⏳ Pending eval | 55 |
 | ❌ Blocked | 20 |
 | 🔲 Not yet attempted | 18 |
-| **Verified score** | **4.845/6 = 80.8%** |
+| **Verified score** | **4.845/8 = 60.6%** |
 
 > Scores are ONLY from OSWorld official evaluator (`desktop_env/evaluators/`).
 
@@ -27,10 +27,10 @@
 | 6 | `4e9f0faf` | Extract invoice table | | |
 | 7 | `510f64c8` | Start VS Code from terminal | **0.0** | VS Code已打开project，但eval extension未激活(activationEvents为空) |
 | 8 | `51f5801c` | Extract Impress notes to docx | **1.0** | python-pptx提取notes + python-docx保存，ignore_blanks |
-| 9 | `58565672` | Open email link in Chrome | | |
+| 9 | `58565672` | Open email link in Chrome | **N/A** | 需要外网访问amazon.com，VM网络503 |
 | 10 | `78aed49a` | Save email attachments | | |
 | 11 | `897e3b53` | Convert docx form | | |
-| 12 | `937087b6` | Set VLC as default player | | |
+| 12 | `937087b6` | Set VLC as default player | **0.0** | 部分video类型未覆盖，evaluator检查所有MIME type |
 | 13 | `a0b9dc9c` | Backup emails | | |
 | 14 | `b52b40a5` | Merge PDFs | | |
 | 15 | `c867c42d` | Export TB contacts to CSV/XLSX | | |
