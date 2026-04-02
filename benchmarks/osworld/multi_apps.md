@@ -1,17 +1,17 @@
 # OSWorld Multi-Apps Domain — GUI Agent Skills Results
 
-> 101 tasks total | Last updated: 2026-04-02 16:52 HKT
+> 101 tasks total | Last updated: 2026-04-02 16:57 HKT
 
 ## Current Status
 
 | Metric | Value |
 |--------|-------|
 | Total tasks | 101 |
-| ✅ Verified (official eval) | 26 |
-| ⏳ Pending eval | 37 |
-| ❌ Blocked | 20 |
+| ✅ Verified (official eval) | 27 |
+| ⏳ Pending eval | 35 |
+| ❌ Blocked | 21 |
 | 🔲 Not yet attempted | 18 |
-| **Verified score** | **20.443/26 = 78.6%** |
+| **Verified score** | **21.443/27 = 79.4%** |
 
 > Scores are ONLY from OSWorld official evaluator (`desktop_env/evaluators/`).
 
@@ -51,8 +51,8 @@
 | 30 | `48d05431` | Install conda | **1.0** | 下载Miniconda3-aarch64安装+conda init bash，bashrc含conda initialize |
 | 31 | `68a25bd4` | Download paper + find citation | **1.0** | 下载BERT PDF(arxiv)，识别TinyBERT引用了BERT，python-docx写ans.docx |
 | 32 | `eb303e01` | Insert speaker notes to PPTX | **1.0** | 从notes.docx解析各slide备注，python-pptx插入到PPTX notes，修复Slide4多余空段落 |
-| 33 | `0c825995` | Environmental policy report | | |
-| 34 | `c7c1e4c3` | Collect professor emails | | |
+| 33 | `0c825995` | Environmental policy report | **N/A** | ❌ Blocked: 需要Google Drive登录+API credentials，settings只有template |
+| 34 | `c7c1e4c3` | Collect professor emails | **1.0** | 访问3位HKU教授主页获取邮箱，openpyxl填入xlsx的Email列 |
 | 35 | `d1acdb87` | Hong Kong restaurant info | | |
 | 36 | `deec51c9` | arxiv paper list | | |
 | 37 | `8e116af7` | Update bookkeeping from receipts | | |
