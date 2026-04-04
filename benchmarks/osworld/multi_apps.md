@@ -1,17 +1,17 @@
 # OSWorld Multi-Apps Domain — GUI Agent Skills Results
 
-> 101 tasks total | Last updated: 2026-04-04 14:50 HKT
+> 101 tasks total | Last updated: 2026-04-04 15:10 HKT
 
 ## Current Status
 
 | Metric | Value |
 |--------|-------|
 | Total tasks | 101 |
-| ✅ Verified (official eval) | 33 |
-| ⏳ Pending eval | 29 |
+| ✅ Verified (official eval) | 34 |
+| ⏳ Pending eval | 28 |
 | ❌ Blocked | 21 |
 | 🔲 Not yet attempted | 18 |
-| **Verified score** | **27.389/33 = 83.0%** |
+| **Verified score** | **28.272/34 = 83.2%** |
 
 > Scores are ONLY from OSWorld official evaluator (`desktop_env/evaluators/`).
 
@@ -60,7 +60,7 @@
 | 39 | `82e3c869` | Sort event photos | **1.0** | image tool识别6张seminar照片中presenter(Tao Yu)→文件管理器右键New Folder→Open in Terminal→mv+cp+zip命令 |
 | 40 | `185f29bd` | Excel to PDF form | **0.946** | Excel读7员工数据→PyPDF2填充PDF表单(text fields+√checkmarks)→每人一个PDF文件 |
 | 41 | `869de13e` | Organize desktop files | **1.0** | 桌面14个文件→PDF content analysis识别academic papers→右键Open in Terminal→mv命令分3类(Paper_reading/Projects/Miscellaneous) |
-| 42 | `2c1ebcd7` | Review case study references | | |
+| 42 | `2c1ebcd7` | Review case study references | **0.883** | 下载case study.docx→分析9条引用→修正APA 7格式(DOI格式/Retrieved/年份括号/去ISSN/去引号)→python-docx写回→LO Writer打开 |
 | 43 | `3a93cae4` | Add lecture to timetable | | |
 | 44 | `1f18aa87` | Grammar test answers | | |
 | 45 | `26150609` | Fix Snake game code | | |
