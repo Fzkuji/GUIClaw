@@ -50,22 +50,28 @@ Rules:
 def _detect_provider() -> tuple[str, str]:
     """Auto-detect the best available provider.
 
+    Priority: Claude Code CLI > Anthropic API > OpenAI API.
+    Claude Code CLI is preferred because it uses your subscription
+    (no per-token cost). API providers are fallbacks.
+
     Returns (provider_name, default_model).
     """
+    # Prefer Claude Code CLI — uses subscription, no per-token cost
+    if shutil.which("claude"):
+        return "claude-code", "sonnet"
+    # Fallback to API providers (expensive)
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic", "claude-sonnet-4-20250514"
     if os.environ.get("OPENAI_API_KEY"):
         return "openai", "gpt-4o"
-    if shutil.which("claude"):
-        return "claude-code", "sonnet"
     raise RuntimeError(
-        "No LLM provider found. Set one of:\n"
-        "  - ANTHROPIC_API_KEY (recommended)\n"
-        "  - OPENAI_API_KEY\n"
-        "  - Install Claude Code CLI: npm install -g @anthropic-ai/claude-code\n"
+        "No LLM provider found. Options (in order of preference):\n"
+        "  1. Install Claude Code CLI (recommended, uses subscription):\n"
+        "     npm install -g @anthropic-ai/claude-code && claude login\n"
+        "  2. Set ANTHROPIC_API_KEY (API, pay per token)\n"
+        "  3. Set OPENAI_API_KEY (API, pay per token)\n"
         "\n"
-        "OpenClaw users: OpenClaw sets these automatically. "
-        "Make sure OpenClaw is running."
+        "OpenClaw users: Claude Code CLI is usually already installed."
     )
 
 
