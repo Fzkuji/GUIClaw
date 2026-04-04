@@ -85,17 +85,59 @@ def vm_key_combo(*keys: str):
 
 
 def vm_type_text(text: str):
-    """Type text character by character (slow, for typewrite)."""
-    escaped = text.replace("'", "\\'").replace('"', '\\"')
-    cmd = f'python3 -c "import pyautogui; pyautogui.typewrite(\'{escaped}\', interval=0.02)"'
+    """Type text via pyautogui on the VM.
+
+    Uses pyautogui.write() for simple alphanumeric text.
+    Falls back to character-by-character input for special characters.
+    """
+    b64 = base64.b64encode(text.encode()).decode()
+    # Use a script that handles special chars properly
+    cmd = (
+        f"python3 -c \""
+        f"import base64,pyautogui,time; "
+        f"t=base64.b64decode('{b64}').decode(); "
+        f"pyautogui.write(t, interval=0.02) if t.isalnum() else "
+        f"[pyautogui.press(c) if c.isalnum() or c in '.-_' else "
+        f"pyautogui.hotkey('shift','9') if c=='(' else "
+        f"pyautogui.hotkey('shift','0') if c==')' else "
+        f"pyautogui.hotkey('shift',';') if c==':' else "
+        f"pyautogui.press('minus') if c=='-' else "
+        f"pyautogui.press('space') if c==' ' else "
+        f"pyautogui.hotkey('shift','1') if c=='!' else "
+        f"pyautogui.hotkey('shift','/') if c=='?' else "
+        f"pyautogui.hotkey('shift','2') if c=='@' else "
+        f"pyautogui.hotkey('shift',\"'\"  ) if c=='\\\"' else "
+        f"pyautogui.press(c) "
+        f"for c in t]"
+        f"\""
+    )
     _vm_exec(cmd)
     time.sleep(0.3)
 
 
 def vm_paste_text(text: str):
-    """Paste text via xdotool on the VM."""
-    # Use xdotool to type text (handles unicode better)
+    """Paste text via clipboard on the VM.
+
+    Writes text to a temp file, pipes to xclip/xsel if available,
+    otherwise falls back to pyperclip or character-by-character typing.
+    """
     b64 = base64.b64encode(text.encode()).decode()
-    cmd = f"python3 -c \"import base64,subprocess; t=base64.b64decode('{b64}').decode(); subprocess.run(['xdotool','type','--clearmodifiers','--delay','20',t])\""
-    _vm_exec(cmd)
-    time.sleep(0.3)
+    # Try multiple clipboard methods, fall back to typing
+    cmd = (
+        f"python3 -c \""
+        f"import base64,subprocess,os,pyautogui,time; "
+        f"t=base64.b64decode('{b64}').decode(); "
+        f"f='/tmp/_vm_clip.txt'; "
+        f"open(f,'w').write(t); "
+        f"ok=False; "
+        f"[ok:=True for _ in [0] if not ok and subprocess.run('xclip -selection clipboard < '+f,shell=True).returncode==0]; "
+        f"[ok:=True for _ in [0] if not ok and subprocess.run('xsel --clipboard --input < '+f,shell=True).returncode==0]; "
+        f"exec('try:\\n import pyperclip; pyperclip.copy(t); ok=True\\nexcept: pass') if not ok else None; "
+        f"pyautogui.hotkey('ctrl','v') if ok else None; "
+        f"time.sleep(0.3)"
+        f"\""
+    )
+    result = _vm_exec(cmd)
+    # If clipboard paste failed, fall back to typing
+    if result.get("error"):
+        vm_type_text(text)
