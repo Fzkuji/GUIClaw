@@ -33,3 +33,4 @@ actions/_actions.yaml
 
 # Runtime state files
 skills/gui-report/scripts/.tracker_state.json
+agentic/
