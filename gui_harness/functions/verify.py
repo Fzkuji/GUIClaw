@@ -1,5 +1,7 @@
 """
-gui_harness.functions.verify — verify the result of a previous action.
+verify — check if an action achieved the expected result.
+
+Session mode: summarize={"depth": 0, "siblings": 0}
 """
 
 from __future__ import annotations
@@ -24,12 +26,7 @@ def _get_runtime():
 def verify(expected: str, runtime=None) -> dict:
     """Verify whether a previous action produced the expected result.
 
-    Args:
-        expected: Description of what should be visible after the action.
-        runtime:  Optional: Runtime instance.
-
-    Returns:
-        dict with keys: expected, actual, verified, evidence, screenshot_path
+    Returns dict: expected, actual, verified, evidence, screenshot_path
     """
     rt = runtime or _get_runtime()
 
@@ -39,21 +36,19 @@ def verify(expected: str, runtime=None) -> dict:
         f"  '{el.get('label', '')}'" for el in ocr_results[:40]
     )
 
-    prompt = f"""Verify that the expected outcome was achieved.
+    prompt = f"""Verify the expected outcome.
 
 Expected: {expected}
 
-OCR text visible on screen:
+OCR text on screen:
 {ocr_lines or '(none)'}
-
-Look at the screenshot and determine if the expected outcome is visible.
 
 Return JSON:
 {{
   "expected": "{expected}",
-  "actual": "what you actually see on screen",
+  "actual": "what you see",
   "verified": true/false,
-  "evidence": "specific text or element that confirms/denies the expectation",
+  "evidence": "specific confirmation/denial",
   "screenshot_path": "{img_path}"
 }}"""
 
@@ -67,13 +62,10 @@ Return JSON:
         result.setdefault("screenshot_path", img_path)
     except Exception:
         result = {
-            "expected": expected,
-            "actual": reply[:300],
-            "verified": False,
-            "evidence": "Failed to parse LLM response",
+            "expected": expected, "actual": reply[:300],
+            "verified": False, "evidence": "Failed to parse LLM response",
             "screenshot_path": img_path,
         }
-
     return result
 
 

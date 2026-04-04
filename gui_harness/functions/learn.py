@@ -1,5 +1,7 @@
 """
-gui_harness.functions.learn — learn an app's UI for the first time.
+learn — learn an app's UI by labeling detected components.
+
+Session mode: summarize={"depth": 0, "siblings": 0}
 """
 
 from __future__ import annotations
@@ -26,19 +28,8 @@ def _get_runtime():
 def learn(app_name: str, runtime=None) -> dict:
     """Learn the UI of an app by labeling its components.
 
-    Takes a screenshot, runs full detection, and uses the LLM to:
-    - Name each detected UI component
-    - Identify the current page/state
-    - Filter out decorative elements
-
-    Args:
-        app_name: Name of the app to learn.
-        runtime:  Optional: Runtime instance.
-
-    Returns:
-        dict with keys:
-            app_name, page_name, components_found, components_saved,
-            component_names, already_known
+    Returns dict: app_name, page_name, components_found,
+    components_saved, component_names, already_known
     """
     rt = runtime or _get_runtime()
 
@@ -51,10 +42,8 @@ def learn(app_name: str, runtime=None) -> dict:
         elements = ocr_results
 
     det_lines = "\n".join(
-        f"  Component {i}: "
-        f"at ({el.get('cx', 0)}, {el.get('cy', 0)}) "
-        f"size={el.get('w', 0)}x{el.get('h', 0)} "
-        f"label={el.get('label') or 'unknown'}"
+        f"  Component {i}: at ({el.get('cx', 0)}, {el.get('cy', 0)}) "
+        f"size={el.get('w', 0)}x{el.get('h', 0)} label={el.get('label') or 'unknown'}"
         for i, el in enumerate(elements[:50])
     )
     ocr_lines = "\n".join(
@@ -62,23 +51,21 @@ def learn(app_name: str, runtime=None) -> dict:
         for el in ocr_results[:60]
     )
 
-    prompt = f"""You are learning the UI of "{app_name}" for the first time.
+    prompt = f"""Learning UI of "{app_name}".
 
-Detected UI components (need labels):
+Detected components:
 {det_lines or '(none)'}
 
-OCR text visible on screen:
+OCR text:
 {ocr_lines or '(none)'}
 
-For each interactive component:
-1. Assign a descriptive snake_case name (e.g., search_bar, send_button)
-2. Skip purely decorative or background elements
-3. Identify the current page name
+Label each interactive component with snake_case names.
+Skip decorative elements. Identify the page name.
 
 Return JSON:
 {{
   "app_name": "{app_name}",
-  "page_name": "current_page_name",
+  "page_name": "current_page",
   "component_names": ["search_bar", "send_button", ...],
   "components_found": {len(elements)},
   "components_saved": 0,
@@ -97,23 +84,19 @@ Return JSON:
 
         # Save to app_memory if available
         try:
-            _SCRIPTS_DIR = str(Path(__file__).parent.parent.parent / "scripts")
-            if _SCRIPTS_DIR not in sys.path:
-                sys.path.insert(0, _SCRIPTS_DIR)
+            scripts_dir = str(Path(__file__).parent.parent.parent / "scripts")
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
             from app_memory import learn_from_screenshot
             saved = learn_from_screenshot(img_path, app_name, result.get("page_name", "unknown"))
             result["components_saved"] = saved.get("saved", 0)
         except Exception:
             pass
-
     except Exception:
         result = {
-            "app_name": app_name,
-            "page_name": "unknown",
-            "component_names": [],
-            "components_found": len(elements),
-            "components_saved": 0,
-            "already_known": False,
+            "app_name": app_name, "page_name": "unknown",
+            "component_names": [], "components_found": len(elements),
+            "components_saved": 0, "already_known": False,
         }
 
     return result

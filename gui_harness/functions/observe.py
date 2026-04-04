@@ -1,11 +1,8 @@
 """
-gui_harness.functions.observe — observe the current screen state.
+observe — screenshot + OCR + detection + LLM analysis.
 
-observe() is an @agentic_function that:
-  1. Takes a screenshot
-  2. Runs OCR + GPA-GUI-Detector
-  3. Asks the LLM to interpret the results with the screenshot
-  4. Returns a structured dict
+Session mode: summarize={"depth": 0, "siblings": 0}
+The OpenClaw agent accumulates context, so we only send this call's data.
 """
 
 from __future__ import annotations
@@ -16,7 +13,6 @@ from agentic import agentic_function
 from gui_harness.primitives import screenshot, ocr, detector
 from gui_harness.primitives.input import get_frontmost_app
 
-# Lazy default runtime
 _runtime = None
 
 
@@ -32,18 +28,12 @@ def _get_runtime():
 def observe(task: str, app_name: str = None, runtime=None) -> dict:
     """Observe the current screen state.
 
-    Takes a screenshot, runs OCR and UI detection, then asks the LLM
-    to interpret the combined data and return a structured analysis.
+    1. Takes a screenshot
+    2. Runs OCR + UI detection
+    3. Sends data + screenshot to LLM for analysis
 
-    Args:
-        task:       What to look for on screen.
-        app_name:   Optional: override frontmost app detection.
-        runtime:    Optional: Runtime instance (uses default GUIRuntime if None).
-
-    Returns:
-        dict with keys:
-            app_name, page_description, visible_text, interactive_elements,
-            target_visible, target_location, screenshot_path
+    Returns dict: app_name, page_description, visible_text,
+    interactive_elements, target_visible, target_location, screenshot_path
     """
     rt = runtime or _get_runtime()
 
@@ -64,34 +54,32 @@ def observe(task: str, app_name: str = None, runtime=None) -> dict:
         for el in ocr_results[:60]
     )
     det_lines = "\n".join(
-        f"  [{el.get('label', 'UI element')}] "
-        f"at ({el.get('cx', 0)}, {el.get('cy', 0)}) "
-        f"size={el.get('w', 0)}x{el.get('h', 0)} "
-        f"conf={el.get('confidence', 0):.2f}"
+        f"  [{el.get('label', 'UI')}] at ({el.get('cx', 0)}, {el.get('cy', 0)}) "
+        f"size={el.get('w', 0)}x{el.get('h', 0)} conf={el.get('confidence', 0):.2f}"
         for el in elements[:50]
     )
 
     prompt = f"""Task: {task}
 App: {app_name}
 
-OCR text on screen (click-space coordinates):
+OCR text (click-space coordinates):
 {ocr_lines or '(none)'}
 
 Detected UI elements (click-space coordinates):
 {det_lines or '(none)'}
 
-Analyze the screenshot and data above. Return JSON:
+Return JSON:
 {{
   "app_name": "{app_name}",
-  "page_description": "short description of current page/state",
-  "visible_text": ["key", "text", "labels"],
-  "interactive_elements": ["clickable", "element", "names"],
+  "page_description": "...",
+  "visible_text": ["..."],
+  "interactive_elements": ["..."],
   "target_visible": true/false,
-  "target_location": {{"x": 0, "y": 0, "label": "element"}} or null,
+  "target_location": {{"x": 0, "y": 0, "label": "..."}} or null,
   "screenshot_path": "{img_path}"
 }}
 
-IMPORTANT: coordinates MUST come from the OCR/detector lists above."""
+Coordinates MUST come from the OCR/detector lists above."""
 
     reply = rt.exec(content=[
         {"type": "text", "text": prompt},
