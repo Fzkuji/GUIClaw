@@ -59,7 +59,8 @@ def main():
     print()
     for h in result["history"]:
         icon = "✅" if h.get("success", True) else "❌"
-        print(f"  {h['step']}. {icon} {h['action']} → {h.get('target', '')[:40]}")
+        target_str = str(h.get('target', '') or '')[:40]
+        print(f"  {h['step']}. {icon} {h['action']} → {target_str}")
         if h.get("reasoning"):
             print(f"     💭 {h['reasoning'][:60]}")
     print("=" * 60)
