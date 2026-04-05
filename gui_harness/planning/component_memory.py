@@ -556,3 +556,163 @@ def locate_target(
     if found:
         found["timing"] = _timing
     return found
+
+
+# ═══════════════════════════════════════════
+# State identification & transition graph
+# ═══════════════════════════════════════════
+
+def identify_state(app_name: str, img_path: str) -> tuple[Optional[str], set[str]]:
+    """Identify the current state by matching components on screen.
+
+    Takes a screenshot, runs template matching against saved components,
+    then uses the matched component set to identify the state via Jaccard.
+
+    If the state is new (Jaccard < 0.7 against all known states), creates
+    a new state entry.
+
+    Returns:
+        (state_id, matched_component_names)
+        state_id is None if no components are saved yet.
+    """
+    app_dir = app_memory.get_app_dir(app_name)
+
+    # Template match to find visible components
+    matched = match_memory_components(app_name, img_path)
+    matched_names = {c["name"] for c in matched}
+
+    if not matched_names:
+        return None, matched_names
+
+    # Load state and component data
+    states = app_memory.load_states(app_dir)
+    components = app_memory.load_components(app_dir)
+
+    # Identify or create state
+    state_id, states = app_memory.identify_or_create_state(
+        states, matched_names, components
+    )
+    app_memory.save_states(app_dir, states)
+
+    return state_id, matched_names
+
+
+def record_transition(
+    app_name: str,
+    from_state: Optional[str],
+    action: str,
+    action_target: str,
+    to_state: Optional[str],
+):
+    """Record a state transition in the transition graph.
+
+    Stores: (from_state, action:target) → to_state
+
+    Only records if both states are identified (not None).
+    Deduplicates by key — same transition overwrites.
+    """
+    if from_state is None or to_state is None:
+        return
+
+    app_dir = app_memory.get_app_dir(app_name)
+    transitions = app_memory.load_transitions(app_dir)
+
+    key = f"{from_state}|{action}:{action_target}"
+    transitions[key] = {
+        "from": from_state,
+        "to": to_state,
+        "action": action,
+        "target": action_target,
+        "last_used": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "use_count": transitions.get(key, {}).get("use_count", 0) + 1,
+    }
+
+    app_memory.save_transitions(app_dir, transitions)
+
+
+def get_available_transitions(app_name: str, current_state: str) -> list[dict]:
+    """Get all known transitions from the current state.
+
+    Returns a list of possible actions with their expected next states.
+    Sorted by use_count descending (most used first).
+
+    Returns:
+        list[dict]: Each dict has keys:
+            - action: str (e.g., "click", "shortcut")
+            - target: str (e.g., "save_button", "ctrl+s")
+            - to_state: str (state ID)
+            - use_count: int
+    """
+    if current_state is None:
+        return []
+
+    app_dir = app_memory.get_app_dir(app_name)
+    transitions = app_memory.load_transitions(app_dir)
+
+    available = []
+    for key, trans in transitions.items():
+        if trans.get("from") == current_state:
+            available.append({
+                "action": trans["action"],
+                "target": trans["target"],
+                "to_state": trans["to"],
+                "use_count": trans.get("use_count", 1),
+            })
+
+    available.sort(key=lambda t: t["use_count"], reverse=True)
+    return available
+
+
+@agentic_function(summarize={"depth": 0, "siblings": 0})
+def select_transition(
+    task: str,
+    current_state: str,
+    available_transitions: list[dict],
+    runtime=None,
+) -> dict:
+    """Given the task and available transitions from the current state,
+    select the best transition to take.
+
+    You are given:
+    - The task to accomplish
+    - The current state ID
+    - A list of transitions that have been successfully used before
+
+    Each transition has: action, target, expected next state, use_count.
+
+    If one of these transitions is clearly the right next step for the task,
+    select it. If none are relevant, return {"selected": false}.
+
+    Return JSON:
+    {
+      "selected": true/false,
+      "index": <index in the list, 0-based>,
+      "reasoning": "why this transition"
+    }
+    """
+    from gui_harness.utils import parse_json
+    from gui_harness.runtime import GUIRuntime
+
+    rt = runtime or GUIRuntime()
+
+    trans_lines = "\n".join(
+        f"  [{i}] {t['action']}:{t['target']} → state {t['to_state']} (used {t['use_count']}x)"
+        for i, t in enumerate(available_transitions)
+    )
+
+    context = f"""Task: {task}
+Current state: {current_state}
+
+Known transitions from this state:
+{trans_lines}
+
+Select the transition that best advances the task.
+If none are relevant, return {{"selected": false}}.
+Return ONLY valid JSON."""
+
+    reply = rt.exec(content=[{"type": "text", "text": context}])
+
+    try:
+        return parse_json(reply)
+    except Exception:
+        return {"selected": False, "reasoning": f"Parse failed: {reply[:200]}"}

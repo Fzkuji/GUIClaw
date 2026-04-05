@@ -1,22 +1,31 @@
 """
-execute_task — the main Phase 0-5 planning loop.
+execute_task — the main planning loop with state-based workflow reuse.
 
-Each step:
-  Phase 0: Screenshot → LLM sees image → decides action
-    ├─ No coordinates needed (type/key_press/shortcut/paste/done) → execute directly
-    └─ Coordinates needed (click/double_click/right_click/drag) → Phase 1-5
-  Phase 1: GPA detection + OCR → N components
-  Phase 2: Template match against memory → known components
-  Phase 3: LLM finds target in known components → execute if found
-  Phase 4: Label unknown components one-by-one (stop when found)
-  Phase 5: Cleanup temporary files
+Each step follows a tiered decision process:
+
+  Tier 0: Check transition graph — known state + known transition?
+    ├─ Single matching transition + no coordinates → execute directly (zero LLM)
+    ├─ Single matching transition + coordinates → template match + execute
+    ├─ Multiple transitions → LLM selects (choice, one LLM call)
+    └─ No matching transition → fall through to Tier 1
+
+  Tier 1: Phase 0-5 (full LLM planning)
+    Phase 0: Screenshot → LLM sees image → decides action
+      ├─ No coordinates needed → execute directly
+      └─ Coordinates needed → Phase 1-5 (locate_target)
+
+After each action:
+  - Identify new state via component matching
+  - Record (old_state, action, new_state) to transition graph
+  - State + transition memory accumulates over tasks
 
 execute_task is a plain function (not @agentic_function) because it
-orchestrates the loop. Only plan_next_action is an @agentic_function.
+orchestrates the loop.
 """
 
 from __future__ import annotations
 
+import sys
 import time
 
 from agentic import agentic_function
@@ -24,7 +33,14 @@ from agentic import agentic_function
 from gui_harness.utils import parse_json
 from gui_harness.perception import screenshot as _screenshot
 from gui_harness.action import input as _input
-from gui_harness.planning.component_memory import locate_target
+from gui_harness.planning.component_memory import (
+    locate_target,
+    identify_state,
+    record_transition,
+    get_available_transitions,
+    select_transition,
+    match_memory_components,
+)
 
 # Actions that require screen coordinates
 COORD_ACTIONS = {"click", "double_click", "right_click", "drag"}
@@ -223,12 +239,14 @@ def _execute_coord_action(
 # ═══════════════════════════════════════════
 
 def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "desktop") -> dict:
-    """Execute a GUI task autonomously using the Phase 0-5 loop.
+    """Execute a GUI task autonomously with state-based workflow reuse.
 
-    Each iteration:
-      Phase 0: Screenshot → LLM sees image → decides action
-      If action needs coordinates → Phase 1-5 (locate_target)
-      If action is no-coord → execute directly
+    Each step uses a tiered decision process:
+      Tier 0: Check transition graph for known paths (zero or minimal LLM)
+      Tier 1: Full Phase 0-5 (LLM planning + detection)
+
+    After each action, records (old_state, action, new_state) to the
+    transition graph for future reuse.
 
     Args:
         task:       Natural language description of what to do.
@@ -237,44 +255,90 @@ def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "
         app_name:   App name for component memory (default: "desktop").
 
     Returns:
-        dict: task, success, steps_taken, history, timing
+        dict: task, success, steps_taken, history, total_time
     """
     rt = runtime or _get_runtime()
     history = []
     completed = False
     task_start = time.time()
+    prev_state = None
 
     for step in range(1, max_steps + 1):
         step_start = time.time()
         timing = {}
+        decision_tier = None
 
-        # Phase 0: Screenshot → LLM decides
+        # Screenshot (needed for both tiers)
         t0 = time.time()
         img_path = _screenshot.take()
         timing["screenshot"] = round(time.time() - t0, 2)
         time.sleep(0.3)
 
+        # ── Tier 0: Check transition graph ──
         t0 = time.time()
-        plan = plan_next_action(
-            task=task,
-            img_path=img_path,
-            step=step,
-            max_steps=max_steps,
-            history=history,
-            runtime=rt,
-        )
-        timing["plan_llm"] = round(time.time() - t0, 2)
+        current_state, matched_components = identify_state(app_name, img_path)
+        timing["state_identify"] = round(time.time() - t0, 2)
 
-        action = plan.get("action", "done")
+        action = None
+        plan = {}
+
+        if current_state is not None:
+            transitions = get_available_transitions(app_name, current_state)
+            if transitions:
+                if len(transitions) == 1:
+                    # Single known transition — check if relevant to task
+                    # For non-coord actions, execute directly (zero LLM)
+                    trans = transitions[0]
+                    if trans["action"] in NO_COORD_ACTIONS and trans["use_count"] >= 2:
+                        action = trans["action"]
+                        plan = {"action": action, "target": trans["target"],
+                                "reasoning": f"Tier 0: replay {trans['action']}:{trans['target']} (used {trans['use_count']}x)"}
+                        decision_tier = 0
+                        print(f"  [step {step}] Tier 0: direct replay {action}:{trans['target']}", file=sys.stderr)
+
+                if action is None and len(transitions) >= 1:
+                    # Multiple transitions or single untrusted — ask LLM to select
+                    t0 = time.time()
+                    selection = select_transition(
+                        task=task,
+                        current_state=current_state,
+                        available_transitions=transitions,
+                        runtime=rt,
+                    )
+                    timing["tier0_select"] = round(time.time() - t0, 2)
+
+                    if selection.get("selected"):
+                        idx = selection.get("index", 0)
+                        if 0 <= idx < len(transitions):
+                            trans = transitions[idx]
+                            action = trans["action"]
+                            plan = {"action": action, "target": trans["target"],
+                                    "reasoning": f"Tier 0: LLM selected {action}:{trans['target']}"}
+                            decision_tier = 0
+                            print(f"  [step {step}] Tier 0: LLM selected {action}:{trans['target']}", file=sys.stderr)
+
+        # ── Tier 1: Full Phase 0 (LLM planning from screenshot) ──
+        if action is None:
+            t0 = time.time()
+            plan = plan_next_action(
+                task=task,
+                img_path=img_path,
+                step=step,
+                max_steps=max_steps,
+                history=history,
+                runtime=rt,
+            )
+            timing["plan_llm"] = round(time.time() - t0, 2)
+            action = plan.get("action", "done")
+            decision_tier = 1
+            print(f"  [step {step}] Tier 1: LLM planned {action}", file=sys.stderr)
 
         # Parse failure → retry next iteration
         if action == "retry":
             history.append({
-                "step": step,
-                "action": "retry",
+                "step": step, "action": "retry", "tier": decision_tier,
                 "reasoning": plan.get("reasoning", "parse failed"),
-                "success": False,
-                "timing": timing,
+                "success": False, "timing": timing,
             })
             continue
 
@@ -282,11 +346,9 @@ def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "
         if action == "done":
             completed = True
             history.append({
-                "step": step,
-                "action": "done",
+                "step": step, "action": "done", "tier": decision_tier,
                 "reasoning": plan.get("reasoning", ""),
-                "success": True,
-                "timing": timing,
+                "success": True, "timing": timing,
             })
             break
 
@@ -309,6 +371,22 @@ def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "
 
         # Brief pause for UI to respond
         time.sleep(0.5)
+
+        # ── Record state transition ──
+        t0 = time.time()
+        after_img = _screenshot.take("/tmp/gui_agent_after.png")
+        new_state, _ = identify_state(app_name, after_img)
+        if result.get("success", False):
+            record_transition(
+                app_name=app_name,
+                from_state=current_state,
+                action=action,
+                action_target=plan.get("target", ""),
+                to_state=new_state,
+            )
+        prev_state = new_state
+        timing["state_record"] = round(time.time() - t0, 2)
+
         timing["step_total"] = round(time.time() - step_start, 2)
 
         history.append({
@@ -318,6 +396,9 @@ def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "
             "text": plan.get("text"),
             "reasoning": plan.get("reasoning", ""),
             "success": result.get("success", False),
+            "tier": decision_tier,
+            "state_before": current_state,
+            "state_after": new_state,
             "timing": timing,
         })
 

@@ -22,49 +22,62 @@ python3 {baseDir}/gui_harness/main.py "Open Firefox and go to google.com"
 python3 {baseDir}/gui_harness/main.py --vm http://VM_IP:5000 "Click the OK button"
 ```
 
-## Architecture: Phase 0-5 Loop
+## Architecture: Tiered Decision with State Memory
 
-Each step in `execute_task()` follows this flow:
+Each step uses a tiered decision process, progressively falling back to more expensive methods:
 
 ```
-Phase 0: Screenshot → LLM sees image → decides action
-  ├─ No coordinates needed (type / key_press / shortcut / paste / scroll)
-  │   → Execute directly, next step
-  │
-  └─ Coordinates needed (click / double_click / right_click / drag)
-      → Enter Phase 1-5 (locate_target)
+Step: Screenshot → Identify State
 
-Phase 1: GPA-GUI-Detector + OCR → N components (sorted by confidence)
-Phase 2: Template match saved memory → known components with labels
-Phase 3: LLM sees known components list → target found? → execute
-Phase 4: Label unknown components one-by-one
-         → LLM identifies each → save to memory → stop when target found
-Phase 5: Cleanup (delete unlabeled temporary crops)
+Tier 0: Transition Graph Reuse (zero or minimal LLM)
+  ├─ Known state + single known transition + no coordinates
+  │   → Execute directly (ZERO LLM calls)
+  ├─ Known state + single transition + coordinates
+  │   → Template match to locate target → execute
+  ├─ Known state + multiple transitions
+  │   → LLM selects from choices (ONE cheap LLM call)
+  └─ Unknown state or no transitions → fall through
+
+Tier 1: Full Planning (Phase 0-5)
+  Phase 0: LLM sees screenshot → decides action
+    ├─ No coordinates needed → execute directly
+    └─ Coordinates needed → Phase 1-5 (locate_target)
+  Phase 1: GPA-GUI-Detector + OCR → N components
+  Phase 2: Template match saved memory → known components
+  Phase 3: LLM finds target in known components (text-only)
+  Phase 4: Label unknown components one-by-one (stop when found)
+  Phase 5: Cleanup
+
+After every action:
+  → Screenshot → Identify new state
+  → Record (old_state, action, new_state) to transition graph
 ```
 
-### Key Design Points
+### Three Layers of Memory
 
-- **Phase 0 is visual**: LLM sees the full screenshot to understand context
-- **Non-coordinate actions skip detection entirely** — no wasted compute
-- **Phase 3 is text-only**: LLM sees a list of labels + coordinates, no image needed
-- **Phase 4 stops early**: once the target is found, remaining components are skipped
-- **Memory accumulates**: labeled components persist across steps and tasks
-- **Drag uses two locate_target calls**: one for start position, one for end
+```
+┌─────────────────────────────────────────┐
+│  Transition Graph (high-level)          │
+│  (state, action) → next_state           │
+│  Enables workflow reuse across tasks     │
+├─────────────────────────────────────────┤
+│  State Definitions (mid-level)          │
+│  state_id → {component set}             │
+│  Identified via Jaccard similarity      │
+├─────────────────────────────────────────┤
+│  Component Memory (low-level)           │
+│  label → template image                 │
+│  Matched via cv2.matchTemplate          │
+│  Auto-forget after 30 consecutive misses│
+└─────────────────────────────────────────┘
+```
 
-## Available Actions
+### Progressive Learning
 
-| Action | Needs Coordinates | Description |
-|--------|:-:|---|
-| `click` | Yes | Single click on an element |
-| `double_click` | Yes | Double-click (open files, edit cells) |
-| `right_click` | Yes | Right-click (context menus) |
-| `drag` | Yes (x2) | Drag from start to end |
-| `type` | No | Type text at current focus |
-| `key_press` | No | Press a key (return, escape, tab, etc.) |
-| `shortcut` | No | Keyboard shortcut (ctrl+s, ctrl+c, etc.) |
-| `paste` | No | Paste text via clipboard |
-| `scroll` | No | Scroll up or down |
-| `done` | No | Task is complete |
+- **1st run**: Full Tier 1 (LLM plans every step). Records transitions + learns components.
+- **2nd run**: Some steps use Tier 0 (known transitions). LLM only needed for unknown parts.
+- **Nth run**: Most steps are Tier 0. Only novel situations require LLM.
+- **Steady state**: Entire workflow runs via template matching + transition replay. Zero LLM.
 
 ## For VMs (OSWorld)
 
@@ -87,4 +100,5 @@ pip install -e .                                 # install GUI Agent Harness
 
 - **Coordinates from detection only** — OCR or GPA-GUI-Detector, never guessed
 - **Look before you act** — every action justified by what was observed
-- **Memory saves automatically** — labeled components persist for future use
+- **Memory saves automatically** — components, states, and transitions persist
+- **Tiered decision** — always try the cheapest method first
