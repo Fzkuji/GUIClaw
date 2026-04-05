@@ -1,26 +1,17 @@
 """
-execute_task — the main planning loop with state-based workflow reuse.
+execute_task — the main planning loop with experience-augmented decisions.
 
-Each step follows a tiered decision process:
+Each step:
+  1. Screenshot → identify current state (component matching)
+  2. Look up known transitions from this state (hints)
+  3. LLM sees screenshot + hints → decides action
+  4. Execute action (locate_target if coordinates needed)
+  5. Screenshot → identify new state → record transition
 
-  Tier 0: Check transition graph — known state + known transition?
-    ├─ Single matching transition + no coordinates → execute directly (zero LLM)
-    ├─ Single matching transition + coordinates → template match + execute
-    ├─ Multiple transitions → LLM selects (choice, one LLM call)
-    └─ No matching transition → fall through to Tier 1
-
-  Tier 1: Phase 0-5 (full LLM planning)
-    Phase 0: Screenshot → LLM sees image → decides action
-      ├─ No coordinates needed → execute directly
-      └─ Coordinates needed → Phase 1-5 (locate_target)
-
-After each action:
-  - Identify new state via component matching
-  - Record (old_state, action, new_state) to transition graph
-  - State + transition memory accumulates over tasks
-
-execute_task is a plain function (not @agentic_function) because it
-orchestrates the loop.
+The transition graph provides hints to help the LLM decide faster,
+but the LLM always sees the actual screenshot and makes the final call.
+Over repeated runs, the hints become more comprehensive and the LLM
+needs less reasoning to make correct decisions.
 """
 
 from __future__ import annotations
@@ -70,12 +61,14 @@ def plan_next_action(
     step: int,
     max_steps: int,
     history: list,
+    known_transitions: list = None,
     runtime=None,
 ) -> dict:
-    """Phase 0: Look at the current screen and decide the next action.
+    """Look at the current screen and decide the next action.
 
     You are given a screenshot of the current screen state and the task
-    to accomplish. Decide what to do next.
+    to accomplish. You may also receive a list of known transitions
+    (actions that have worked before from similar screen states) as hints.
 
     GUI knowledge:
     - Desktop files/icons: DOUBLE_CLICK to open (single click only selects)
@@ -102,6 +95,8 @@ def plan_next_action(
     - "done": task is FULLY completed
 
     IMPORTANT: Only return "done" when the task is truly finished.
+    The known transitions are just hints — use your own judgment based
+    on what you see on screen.
 
     Return ONLY valid JSON:
     {
@@ -123,8 +118,16 @@ def plan_next_action(
             lines.append(f"  {h['step']}. [{status}] {h['action']} -> {target_str}")
         history_summary = f"\nRecent actions:\n" + "\n".join(lines)
 
+    hints = ""
+    if known_transitions:
+        hint_lines = "\n".join(
+            f"  - {t['action']}:{t['target']} (used {t['use_count']}x before)"
+            for t in known_transitions[:5]
+        )
+        hints = f"\nKnown transitions from this screen state (hints, not commands):\n{hint_lines}"
+
     context = f"""Task: {task}
-Step {step}/{max_steps}.{history_summary}
+Step {step}/{max_steps}.{history_summary}{hints}
 
 Look at the screenshot and decide the next action.
 Return ONLY valid JSON."""
@@ -239,14 +242,13 @@ def _execute_coord_action(
 # ═══════════════════════════════════════════
 
 def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "desktop") -> dict:
-    """Execute a GUI task autonomously with state-based workflow reuse.
+    """Execute a GUI task autonomously with experience-augmented decisions.
 
-    Each step uses a tiered decision process:
-      Tier 0: Check transition graph for known paths (zero or minimal LLM)
-      Tier 1: Full Phase 0-5 (LLM planning + detection)
+    Each step: screenshot → identify state → LLM decides (with transition
+    hints if available) → execute → record transition.
 
-    After each action, records (old_state, action, new_state) to the
-    transition graph for future reuse.
+    The transition graph grows over runs, providing increasingly useful
+    hints that help the LLM decide faster.
 
     Args:
         task:       Natural language description of what to do.
@@ -266,99 +268,50 @@ def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "
     for step in range(1, max_steps + 1):
         step_start = time.time()
         timing = {}
-        decision_tier = None
 
-        # Screenshot (needed for both tiers)
+        # Screenshot
         t0 = time.time()
         img_path = _screenshot.take()
         timing["screenshot"] = round(time.time() - t0, 2)
         time.sleep(0.3)
 
-        # ── Tier 0: Check transition graph ──
+        # Identify current state (for transition recording + hints)
         t0 = time.time()
         current_state, matched_components = identify_state(app_name, img_path)
         timing["state_identify"] = round(time.time() - t0, 2)
 
-        action = None
-        plan = {}
-
+        # Get transition hints (if any known transitions from this state)
+        known_transitions = []
         if current_state is not None:
-            transitions = get_available_transitions(app_name, current_state)
+            known_transitions = get_available_transitions(app_name, current_state)
 
-            # Guard: if state hasn't changed for 2+ steps and last action was
-            # the same as what Tier 0 would pick, skip Tier 0 to avoid loops.
-            stuck_in_loop = (
-                len(history) >= 2
-                and history[-1].get("state_before") == current_state
-                and history[-1].get("state_after") == current_state
-                and history[-2].get("state_before") == current_state
+        # LLM decides — always sees the screenshot, with transition hints if available
+        t0 = time.time()
+        try:
+            plan = plan_next_action(
+                task=task,
+                img_path=img_path,
+                step=step,
+                max_steps=max_steps,
+                history=history,
+                known_transitions=known_transitions,
+                runtime=rt,
             )
-
-            if transitions and not stuck_in_loop:
-                if len(transitions) == 1:
-                    # Single known transition — direct replay only if:
-                    # - No coordinates needed
-                    # - Used enough times to trust
-                    # - State actually changed last time this transition was used
-                    trans = transitions[0]
-                    if (trans["action"] in NO_COORD_ACTIONS
-                            and trans["use_count"] >= 3
-                            and trans.get("to_state") != current_state):
-                        action = trans["action"]
-                        plan = {"action": action, "target": trans["target"],
-                                "reasoning": f"Tier 0: replay {trans['action']}:{trans['target']} (used {trans['use_count']}x)"}
-                        decision_tier = 0
-                        print(f"  [step {step}] Tier 0: direct replay {action}:{trans['target']}", file=sys.stderr)
-
-                if action is None and len(transitions) >= 1:
-                    # Multiple transitions or single untrusted — ask LLM to select
-                    t0 = time.time()
-                    selection = select_transition(
-                        task=task,
-                        current_state=current_state,
-                        available_transitions=transitions,
-                        runtime=rt,
-                    )
-                    timing["tier0_select"] = round(time.time() - t0, 2)
-
-                    if selection.get("selected"):
-                        idx = selection.get("index", 0)
-                        if 0 <= idx < len(transitions):
-                            trans = transitions[idx]
-                            action = trans["action"]
-                            plan = {"action": action, "target": trans["target"],
-                                    "reasoning": f"Tier 0: LLM selected {action}:{trans['target']}"}
-                            decision_tier = 0
-                            print(f"  [step {step}] Tier 0: LLM selected {action}:{trans['target']}", file=sys.stderr)
-
-        # ── Tier 1: Full Phase 0 (LLM planning from screenshot) ──
-        if action is None:
-            t0 = time.time()
-            try:
-                plan = plan_next_action(
-                    task=task,
-                    img_path=img_path,
-                    step=step,
-                    max_steps=max_steps,
-                    history=history,
-                    runtime=rt,
-                )
-                action = plan.get("action", "done")
-            except Exception as e:
-                # LLM call failed (timeout, etc.) — reset runtime and retry next step
-                print(f"  [step {step}] Tier 1: ERROR {e.__class__.__name__}, resetting runtime", file=sys.stderr)
-                if hasattr(rt, '_inner') and hasattr(rt._inner, 'reset'):
-                    rt._inner.reset()
-                plan = {"action": "retry", "reasoning": f"LLM error: {e}"}
-                action = "retry"
-            timing["plan_llm"] = round(time.time() - t0, 2)
-            decision_tier = 1
-            print(f"  [step {step}] Tier 1: LLM planned {action}", file=sys.stderr)
+            action = plan.get("action", "done")
+        except Exception as e:
+            print(f"  [step {step}] LLM ERROR: {e.__class__.__name__}, resetting", file=sys.stderr)
+            if hasattr(rt, '_inner') and hasattr(rt._inner, 'reset'):
+                rt._inner.reset()
+            plan = {"action": "retry", "reasoning": f"LLM error: {e}"}
+            action = "retry"
+        timing["plan_llm"] = round(time.time() - t0, 2)
+        has_hints = len(known_transitions) > 0
+        print(f"  [step {step}] {action} (hints={'yes' if has_hints else 'no'})", file=sys.stderr)
 
         # Parse failure → retry next iteration
         if action == "retry":
             history.append({
-                "step": step, "action": "retry", "tier": decision_tier,
+                "step": step, "action": "retry", "had_hints": has_hints,
                 "reasoning": plan.get("reasoning", "parse failed"),
                 "success": False, "timing": timing,
             })
@@ -368,7 +321,7 @@ def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "
         if action == "done":
             completed = True
             history.append({
-                "step": step, "action": "done", "tier": decision_tier,
+                "step": step, "action": "done", "had_hints": has_hints,
                 "reasoning": plan.get("reasoning", ""),
                 "success": True, "timing": timing,
             })
@@ -424,7 +377,7 @@ def execute_task(task: str, runtime=None, max_steps: int = 15, app_name: str = "
             "text": plan.get("text"),
             "reasoning": plan.get("reasoning", ""),
             "success": result.get("success", False),
-            "tier": decision_tier,
+            "had_hints": has_hints,
             "state_before": current_state,
             "state_after": new_state,
             "timing": timing,
