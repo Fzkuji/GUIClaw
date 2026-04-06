@@ -113,8 +113,20 @@ def decide_next_action(
         )
         hints = f"\nKnown transitions from this screen state (hints):\n{hint_lines}"
 
+    # VM context (if running on remote VM)
+    vm_info = ""
+    try:
+        from gui_harness.adapters import vm_adapter
+        if vm_adapter._VM_URL:
+            vm_info = f"""
+Environment: Remote VM at {vm_adapter._VM_URL}
+  Files are on the VM, not local. To access them use:
+  curl -s -X POST {vm_adapter._VM_URL}/execute -H 'Content-Type: application/json' -d '{{"command": "cat /path/to/file", "shell": true}}'"""
+    except Exception:
+        pass
+
     context = f"""Task: {task}
-Step {step}/{max_steps}.{history_summary}{hints}
+Step {step}/{max_steps}.{vm_info}{history_summary}{hints}
 
 Look at the screenshot and decide the next action.
 Return ONLY valid JSON."""

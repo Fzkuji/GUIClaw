@@ -51,8 +51,23 @@ def general_action(sub_task: str, runtime=None) -> dict:
 
     rt = runtime or _get_runtime()
 
+    # Add VM context if available
+    vm_info = ""
+    try:
+        from gui_harness.adapters import vm_adapter
+        if vm_adapter._VM_URL:
+            vm_info = f"""
+Environment: Remote VM at {vm_adapter._VM_URL}
+Files are on the VM, not local. To read/write files, use:
+  curl -s -X POST {vm_adapter._VM_URL}/execute -H 'Content-Type: application/json' -d '{{"command": "cat /path", "shell": true}}'
+To execute commands on VM:
+  curl -s -X POST {vm_adapter._VM_URL}/execute -H 'Content-Type: application/json' -d '{{"command": "your_command", "shell": true}}'
+"""
+    except Exception:
+        pass
+
     reply = rt.exec(content=[
-        {"type": "text", "text": f"Sub-task: {sub_task}\n\nComplete this and return JSON with success/output/error."},
+        {"type": "text", "text": f"Sub-task: {sub_task}\n{vm_info}\nComplete this and return JSON with success/output/error."},
     ])
 
     try:
