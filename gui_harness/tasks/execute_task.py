@@ -60,6 +60,7 @@ def decide_next_action(
     max_steps: int,
     history: list,
     known_transitions: list = None,
+    system_context: str = "",
     runtime=None,
 ) -> dict:
     """Look at the current screen and decide what to do next.
@@ -115,8 +116,10 @@ def decide_next_action(
         )
         hints = f"\nKnown transitions from this screen state (hints):\n{hint_lines}"
 
+    sys_ctx = f"\n{system_context}" if system_context else ""
+
     context = f"""Task: {task}
-Step {step}/{max_steps}.{history_summary}{hints}
+Step {step}/{max_steps}.{sys_ctx}{history_summary}{hints}
 
 Look at the screenshot and decide the next action.
 Return ONLY valid JSON."""
@@ -221,48 +224,27 @@ def _execute_on_vm(code):
 # Agent session initialization
 # ═══════════════════════════════════════════
 
-def _init_agent_context(rt, task, app_name):
-    """Send initial context to the agent session.
+def _build_system_context(task, app_name):
+    """Build the system context string for the agent session.
 
-    This runs once at the start of execute_task to give the agent
-    a complete picture of the environment before any actions.
+    Returns a context string with VM info and capabilities.
+    This is prepended to the first decide_next_action call.
     """
     vm_info = ""
     try:
         from gui_harness.adapters import vm_adapter
         if vm_adapter._VM_URL:
             vm_info = f"""
-You are operating a remote VM at {vm_adapter._VM_URL}.
-All files and applications are on the VM, not on your local machine.
-To execute commands on the VM:
-  curl -s -X POST {vm_adapter._VM_URL}/execute -H 'Content-Type: application/json' -d '{{"command": "your_command", "shell": true}}'
-To read a file: use the command above with "cat /path/to/file".
-To write a file: use the command above with appropriate shell commands.
+Environment: Remote VM at {vm_adapter._VM_URL}
+All files and apps are on the VM, not local.
+VM commands: curl -s -X POST {vm_adapter._VM_URL}/execute -H 'Content-Type: application/json' -d '{{"command": "CMD", "shell": true}}'
 """
     except Exception:
         pass
 
-    init_message = f"""You are a GUI automation agent. Your task: {task}
-
+    return f"""You are a GUI automation agent.
 Application: {app_name}
-{vm_info}
-You have visual perception capabilities:
-- Screenshot analysis (you will see screenshots each step)
-- GPA-GUI-Detector for UI element detection
-- OCR for text recognition
-- Component memory for recognizing previously seen UI elements
-
-You will be asked to decide actions step by step. Prioritize GUI interactions
-(click, double_click, etc.) when the task involves visual UI elements.
-Use general actions only when the task clearly doesn't require GUI interaction
-(e.g., pure code editing, file content analysis).
-
-Reply OK to confirm you understand."""
-
-    try:
-        rt.exec(content=[{"type": "text", "text": init_message}])
-    except Exception:
-        pass  # Best effort — don't fail if init message fails
+{vm_info}"""
 
 
 # ═══════════════════════════════════════════
@@ -287,9 +269,7 @@ def execute_task(task: str, runtime=None, max_steps: int = 30, app_name: str = "
     rt = runtime or _get_runtime()
     history = []
     completed = False
-
-    # Initialize agent session with full context
-    _init_agent_context(rt, task, app_name)
+    system_context = _build_system_context(task, app_name)
     task_start = time.time()
 
     for step in range(1, max_steps + 1):
@@ -328,7 +308,9 @@ def execute_task(task: str, runtime=None, max_steps: int = 30, app_name: str = "
         try:
             plan = decide_next_action(
                 task=task, img_path=img_path, step=step, max_steps=max_steps,
-                history=history, known_transitions=known_transitions, runtime=rt,
+                history=history, known_transitions=known_transitions,
+                system_context=system_context if step == 1 else "",
+                runtime=rt,
             )
         except Exception as e:
             print(f"  [step {step}] LLM ERROR: {e.__class__.__name__}, resetting", file=sys.stderr)
