@@ -216,9 +216,32 @@ def _batch_label(
     offset: int = 0,
     runtime=None,
 ) -> dict:
-    """Send numbered screenshot to LLM for batch component labeling.
+    """Label UI components in a numbered screenshot.
 
-    Returns dict mapping str(index) -> label (e.g., {"0": "search_bar", "1": "skip"}).
+    The screenshot has numbered bounding boxes around detected UI elements.
+    For EACH numbered component, provide a descriptive snake_case name that
+    describes what the component IS and DOES (e.g., "search_bar",
+    "close_button", "settings_icon", "file_menu", "bold_toggle").
+
+    Rules:
+    - Use snake_case, max 30 chars
+    - Return "skip" for decorative, blank, or non-interactive elements
+    - Include the component's function in the name (e.g., "save_button" not
+      just "button")
+    - If OCR text is available and descriptive, incorporate it
+
+    Return ONLY a JSON object mapping number to name:
+    {"0": "search_bar", "1": "skip", "2": "close_button", ...}
+
+    Args:
+        app_name: Name of the application being labeled.
+        icons: List of detected UI components with coordinates.
+        annotated_path: Path to the numbered screenshot image.
+        offset: Starting index for numbering.
+        runtime: LLM runtime instance.
+
+    Returns:
+        Dict mapping str(index) to label name.
     """
     rt = runtime or _get_runtime()
 
@@ -233,28 +256,13 @@ def _batch_label(
             f"conf={icon.get('confidence', 0):.2f}{ocr_hint}"
         )
 
-    prompt = f"""You are labeling UI components in a screenshot of {app_name}.
+    data = f"""App: {app_name}
 
-The screenshot has numbered bounding boxes around detected UI elements.
-Below is a list of each component with its number, position, size, and any OCR text.
-
-{chr(10).join(comp_lines)}
-
-For EACH numbered component, provide a descriptive snake_case name that describes
-what the component IS and DOES (e.g., "search_bar", "close_button", "settings_icon",
-"file_menu", "bold_toggle", "navigation_sidebar").
-
-Rules:
-- Use snake_case, max 30 chars
-- Return "skip" for decorative, blank, or non-interactive elements
-- Include the component's function in the name (e.g., "save_button" not just "button")
-- If OCR text is available and descriptive, incorporate it
-
-Return ONLY a JSON object mapping number to name:
-{{"0": "search_bar", "1": "skip", "2": "close_button", ...}}"""
+Components:
+{chr(10).join(comp_lines)}"""
 
     reply = rt.exec(content=[
-        {"type": "text", "text": prompt},
+        {"type": "text", "text": data},
         {"type": "image", "path": annotated_path},
     ])
 

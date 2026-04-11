@@ -33,12 +33,163 @@ from gui_harness.planning.component_memory import (
     record_transition,
     get_available_transitions,
 )
+from agentic.functions.build_catalog import build_catalog
+from agentic.functions.parse_action import parse_action
 
-# GUI actions that need our visual detection pipeline for coordinates
-GUI_ACTIONS = {"click", "double_click", "right_click", "drag"}
+# ═══════════════════════════════════════════
+# Action wrappers (callable from dispatch)
+# ═══════════════════════════════════════════
 
-# Direct actions that execute immediately without detection
-DIRECT_ACTIONS = {"type", "press", "hotkey", "scroll"}
+def _action_click(target: str, task: str, img_path: str, app_name: str, runtime) -> dict:
+    location = locate_target(task=task, target=target, img_path=img_path, app_name=app_name, runtime=runtime)
+    if not location:
+        return {"success": False, "error": f"Target not found: {target}"}
+    _input.mouse_click(location["cx"], location["cy"])
+    return {"success": True, "location": location}
+
+def _action_double_click(target: str, task: str, img_path: str, app_name: str, runtime) -> dict:
+    location = locate_target(task=task, target=target, img_path=img_path, app_name=app_name, runtime=runtime)
+    if not location:
+        return {"success": False, "error": f"Target not found: {target}"}
+    _input.mouse_double_click(location["cx"], location["cy"])
+    return {"success": True, "location": location}
+
+def _action_right_click(target: str, task: str, img_path: str, app_name: str, runtime) -> dict:
+    location = locate_target(task=task, target=target, img_path=img_path, app_name=app_name, runtime=runtime)
+    if not location:
+        return {"success": False, "error": f"Target not found: {target}"}
+    _input.mouse_right_click(location["cx"], location["cy"])
+    return {"success": True, "location": location}
+
+def _action_drag(target: str, target_end: str, task: str, img_path: str, app_name: str, runtime) -> dict:
+    start = locate_target(task=task, target=f"Find START: {target}", img_path=img_path, app_name=app_name, runtime=runtime)
+    if not start:
+        return {"success": False, "error": f"Start not found: {target}"}
+    end = locate_target(task=task, target=f"Find END: {target_end}", img_path=img_path, app_name=app_name, runtime=runtime)
+    if not end:
+        return {"success": False, "error": f"End not found: {target_end}"}
+    _input.mouse_drag(start["cx"], start["cy"], end["cx"], end["cy"])
+    return {"success": True}
+
+def _action_type(text: str) -> dict:
+    _input.type_text(text)
+    return {"success": True}
+
+def _action_press(key: str) -> dict:
+    _input.key_press(key)
+    return {"success": True}
+
+def _action_hotkey(keys: str) -> dict:
+    key_list = [k.strip() for k in keys.split("+")]
+    _input.key_combo(*key_list)
+    return {"success": True}
+
+def _action_scroll(direction: str) -> dict:
+    _input.key_press("pageup" if direction.lower() == "up" else "pagedown")
+    return {"success": True}
+
+def _action_done(reasoning: str) -> dict:
+    return {"success": True, "done": True, "reasoning": reasoning}
+
+
+def _build_action_registry():
+    """Build the action function registry for LLM dispatch."""
+    return {
+        "click": {
+            "function": _action_click,
+            "description": "Click a UI element on screen (we locate it for you)",
+            "input": {
+                "target": {"source": "llm", "type": str, "description": "description of element to click"},
+                "task": {"source": "context"},
+                "img_path": {"source": "context"},
+                "app_name": {"source": "context"},
+            },
+            "output": {"success": bool},
+        },
+        "double_click": {
+            "function": _action_double_click,
+            "description": "Double-click a UI element on screen",
+            "input": {
+                "target": {"source": "llm", "type": str, "description": "description of element to double-click"},
+                "task": {"source": "context"},
+                "img_path": {"source": "context"},
+                "app_name": {"source": "context"},
+            },
+            "output": {"success": bool},
+        },
+        "right_click": {
+            "function": _action_right_click,
+            "description": "Right-click a UI element on screen",
+            "input": {
+                "target": {"source": "llm", "type": str, "description": "description of element to right-click"},
+                "task": {"source": "context"},
+                "img_path": {"source": "context"},
+                "app_name": {"source": "context"},
+            },
+            "output": {"success": bool},
+        },
+        "drag": {
+            "function": _action_drag,
+            "description": "Drag from one element to another",
+            "input": {
+                "target": {"source": "llm", "type": str, "description": "description of drag start element"},
+                "target_end": {"source": "llm", "type": str, "description": "description of drag end element"},
+                "task": {"source": "context"},
+                "img_path": {"source": "context"},
+                "app_name": {"source": "context"},
+            },
+            "output": {"success": bool},
+        },
+        "type": {
+            "function": _action_type,
+            "description": "Type text using keyboard",
+            "input": {
+                "text": {"source": "llm", "type": str, "description": "text to type"},
+            },
+            "output": {"success": bool},
+        },
+        "press": {
+            "function": _action_press,
+            "description": "Press a keyboard key (enter, tab, escape, etc.)",
+            "input": {
+                "key": {"source": "llm", "type": str, "description": "key to press"},
+            },
+            "output": {"success": bool},
+        },
+        "hotkey": {
+            "function": _action_hotkey,
+            "description": "Press a keyboard shortcut (e.g., ctrl+s, ctrl+c)",
+            "input": {
+                "keys": {"source": "llm", "type": str, "description": "key combination like ctrl+s"},
+            },
+            "output": {"success": bool},
+        },
+        "scroll": {
+            "function": _action_scroll,
+            "description": "Scroll the page up or down",
+            "input": {
+                "direction": {"source": "llm", "type": str, "description": "up or down"},
+            },
+            "output": {"success": bool},
+        },
+        "general": {
+            "function": general_action,
+            "description": "Execute command-line operations on the VM (only for tasks that cannot be done via GUI)",
+            "input": {
+                "sub_task": {"source": "llm", "type": str, "description": "what to do via command line"},
+                "task_context": {"source": "context"},
+            },
+            "output": {"success": bool, "output": str},
+        },
+        "done": {
+            "function": _action_done,
+            "description": "Mark the task as fully complete",
+            "input": {
+                "reasoning": {"source": "llm", "type": str, "description": "why the task is complete"},
+            },
+            "output": {"success": bool},
+        },
+    }
 
 _runtime = None
 
@@ -80,30 +231,22 @@ def decide_next_action(
     max_steps: int,
     history: list,
     system_context: str = "",
+    action_catalog: str = "",
     runtime=None,
 ) -> dict:
     """Look at the screenshot and decide the next action.
 
-    You can see the current screen. Choose one action:
+    You are a GUI agent. Always prefer GUI actions over command-line operations.
+    - If a browser is visible with relevant content, interact via GUI: scroll,
+      click elements, read from the screen.
+    - Only use "general" (command-line) when the information CANNOT be obtained
+      through GUI interaction (e.g., reading/writing files not open on screen).
+    - Do NOT use "general" to scrape websites or run Python scripts when the
+      same data is visible in the browser on screen.
+    - Do NOT generate or paraphrase content from your own knowledge — extract
+      data from what you see on screen or from actual files.
 
-    GUI actions (we locate the target for you):
-      {"action": "click", "target": "description of element to click"}
-      {"action": "double_click", "target": "description of element"}
-      {"action": "right_click", "target": "description of element"}
-
-    Keyboard/input actions:
-      {"action": "type", "text": "text to type"}
-      {"action": "press", "key": "enter"}
-      {"action": "hotkey", "keys": "ctrl+s"}
-      {"action": "scroll", "direction": "down"}
-
-    General action (command-line operations on the VM, no screen needed):
-      {"action": "general", "task": "description of what to do via command line"}
-
-    Task complete:
-      {"action": "done", "reasoning": "why the task is fully complete"}
-
-    Return ONLY valid JSON.
+    Choose one action from the available list and return the corresponding JSON.
     """
     rt = runtime or _get_runtime()
 
@@ -113,13 +256,8 @@ def decide_next_action(
     context = f"""<task>{task}</task>
 <progress>Step {step}/{max_steps}</progress>{sys_ctx}{history_summary}
 
-IMPORTANT: You are a GUI agent. Always prefer GUI actions (click, scroll, type, hotkey) over command-line operations.
-- If a browser is visible with relevant content, interact with it via GUI: scroll to load content, click elements, read from the screen.
-- Only use "general" (command-line) when the information CANNOT be obtained through GUI interaction (e.g., reading/writing files that are not open on screen).
-- Do NOT use "general" to scrape websites or run Python scripts when the same data is visible in the browser on screen.
-- Do NOT generate or paraphrase content from your own knowledge — extract data from what you see on screen or from actual files.
-
-Look at the screenshot and decide the NEXT action. Return ONLY valid JSON."""
+== Available Actions ==
+{action_catalog}"""
 
     reply = rt.exec(content=[
         {"type": "text", "text": context},
@@ -135,71 +273,8 @@ Look at the screenshot and decide the NEXT action. Return ONLY valid JSON."""
         return {"action": "general", "task": reply[:200]}
 
 
-# ═══════════════════════════════════════════
-# Direct actions (no coordinate detection)
-# ═══════════════════════════════════════════
-
-def _execute_direct_action(action, plan):
-    """Execute a direct action that doesn't need coordinate detection.
-
-    Uses gui_harness.action.input which routes to VM when configured.
-    """
-    from gui_harness.action import input as _input
-
-    if action == "type":
-        text = plan.get("text", "")
-        _input.type_text(text)
-        return {"success": True}
-    elif action == "press":
-        key = plan.get("key", plan.get("target", "return"))
-        _input.key_press(key)
-        return {"success": True}
-    elif action == "hotkey":
-        keys_str = plan.get("keys", plan.get("target", ""))
-        keys = [k.strip() for k in keys_str.split("+")]
-        _input.key_combo(*keys)
-        return {"success": True}
-    elif action == "scroll":
-        direction = plan.get("direction", plan.get("target", "down")).lower()
-        _input.key_press("pageup" if direction == "up" else "pagedown")
-        return {"success": True}
-    else:
-        return {"success": False, "error": f"Unknown direct action: {action}"}
 
 
-# ═══════════════════════════════════════════
-# GUI action execution
-# ═══════════════════════════════════════════
-
-def _execute_gui_action(action, plan, task, img_path, app_name, runtime):
-    """Execute a GUI action that needs our visual detection pipeline."""
-    target = plan.get("target", "")
-
-    if action == "drag":
-        target_end = plan.get("target_end", "")
-        start = locate_target(task=task, target=f"Find START: {target}",
-                              img_path=img_path, app_name=app_name, runtime=runtime)
-        if not start:
-            return {"success": False, "error": f"Start not found: {target}"}
-        end = locate_target(task=task, target=f"Find END: {target_end}",
-                            img_path=img_path, app_name=app_name, runtime=runtime)
-        if not end:
-            return {"success": False, "error": f"End not found: {target_end}"}
-        _input.mouse_drag(start["cx"], start["cy"], end["cx"], end["cy"])
-        return {"success": True}
-    else:
-        location = locate_target(task=task, target=target,
-                                 img_path=img_path, app_name=app_name, runtime=runtime)
-        if not location:
-            return {"success": False, "error": f"Target not found: {target}"}
-        cx, cy = location["cx"], location["cy"]
-        if action == "click":
-            _input.mouse_click(cx, cy)
-        elif action == "double_click":
-            _input.mouse_double_click(cx, cy)
-        elif action == "right_click":
-            _input.mouse_right_click(cx, cy)
-        return {"success": True, "location": location}
 
 
 def _check_web_access_needed(sub_task: str) -> str | None:
@@ -211,23 +286,26 @@ def _check_web_access_needed(sub_task: str) -> str | None:
     import re
     task_lower = sub_task.lower()
 
-    # Detect if the task involves fetching from a URL
+    # Only check if the sub_task explicitly mentions scraping/fetching web data
+    # AND contains a URL from a known WAF-protected site
     url_patterns = re.findall(r'https?://[^\s\'")\]]+', sub_task)
-    web_keywords = ["scrape", "fetch", "requests.get", "curl", "beautifulsoup",
-                    "web page", "webpage", "website", "imdb", "wikipedia"]
-    needs_web = bool(url_patterns) or any(kw in task_lower for kw in web_keywords)
+    scrape_keywords = ["scrape", "beautifulsoup", "parse.*html", "extract.*from.*web"]
+    is_scraping = any(kw in task_lower for kw in scrape_keywords)
 
-    if not needs_web:
-        return None
-
-    # Test if we can actually fetch the URL from the VM
-    test_url = url_patterns[0] if url_patterns else None
-    if not test_url:
-        # Try to guess URL from keywords
+    # Only trigger for explicit web scraping tasks with URLs from known problematic sites
+    waf_domains = ["imdb.com", "amazon.com"]
+    test_url = None
+    if url_patterns:
+        for url in url_patterns:
+            if any(domain in url.lower() for domain in waf_domains):
+                test_url = url
+                break
+    if not test_url and is_scraping:
         if "imdb" in task_lower and "top" in task_lower:
             test_url = "https://www.imdb.com/chart/top/"
-        else:
-            return None  # Can't determine URL, let it try
+
+    if not test_url:
+        return None  # No WAF-protected URL detected, let it proceed
 
     try:
         import json, urllib.request
@@ -255,7 +333,7 @@ def _check_web_access_needed(sub_task: str) -> str | None:
         if len(parts) >= 2:
             status_code = int(parts[0])
             size = int(parts[1])
-            if status_code == 202 or size < 1000:
+            if status_code == 202 and size < 1000:
                 return f"HTTP {status_code}, {size} bytes — WAF/challenge blocked"
 
         return None  # Access seems OK
@@ -560,32 +638,26 @@ def _extract_screen_data(task: str, img_path: str, existing_data: str, runtime=N
     - Rating
     - Any other visible details
 
-    IMPORTANT:
+    Rules:
     - Only extract what you can ACTUALLY SEE on the screen right now
     - Do NOT make up or guess any data
     - Do NOT use your own knowledge to fill in missing information
     - If you can't read something clearly, skip it
+    - Use a consistent format (e.g., "1. Title (Year) - Rating")
+    - If this is a continuation, only extract NEW items not in previous data
+    - If nothing relevant is visible, return "NO_DATA"
 
     Return the extracted data as plain text, one item per line.
-    If nothing relevant is visible, return "NO_DATA".
     """
     rt = runtime or _get_runtime()
 
-    prompt = f"""<task>{task}</task>
+    data = f"""<task>{task}</task>
 
 Previously extracted data:
-{existing_data if existing_data else "(none yet)"}
-
-Look at the screenshot and extract ALL relevant data items visible on screen.
-- Extract ONLY what you can see, do NOT generate from memory
-- Use a consistent format (e.g., "1. Title (Year) - Rating")
-- If this is a continuation, only extract NEW items not already in the previous data
-- If nothing relevant is visible, return "NO_DATA"
-
-Return extracted data as plain text."""
+{existing_data if existing_data else "(none yet)"}"""
 
     reply = rt.exec(content=[
-        {"type": "text", "text": prompt},
+        {"type": "text", "text": data},
         {"type": "image", "path": img_path},
     ])
     return reply.strip() if reply else "NO_DATA"
@@ -659,10 +731,15 @@ def _execute_task_loop(task, rt, max_steps, app_name):
                     f"You can now use 'general' for file operations using this extracted data."
                     f"</extracted_data_available>")
         ctx += component_info
+        # Build action registry and catalog
+        available = _build_action_registry()
+        catalog = build_catalog(available)
+
         try:
             plan = decide_next_action(
                 task=task, img_path=img_path, step=step, max_steps=max_steps,
-                history=history, system_context=ctx, runtime=rt,
+                history=history, system_context=ctx, action_catalog=catalog,
+                runtime=rt,
             )
         except Exception as e:
             print(f"  [step {step}] decide ERROR: {e.__class__.__name__}, resetting", file=sys.stderr)
@@ -673,66 +750,83 @@ def _execute_task_loop(task, rt, max_steps, app_name):
             plan = {"action": "general", "task": "retry the previous step"}
         timing["decide"] = round(time.time() - t0, 2)
 
-        action = plan.get("action", "general")
-        print(f"  [step {step}] {action}", file=sys.stderr)
+        # Parse action from LLM response
+        action_name = plan.get("call", plan.get("action", "general"))
+        print(f"  [step {step}] {action_name}", file=sys.stderr)
 
         # Done
-        if action == "done":
+        if action_name == "done":
             completed = True
             history.append({
                 "step": step, "action": "done",
-                "reasoning": plan.get("reasoning", ""),
+                "reasoning": plan.get("args", plan).get("reasoning", plan.get("reasoning", "")),
                 "success": True, "timing": timing,
                 "state_before": current_state, "state_after": current_state,
             })
             break
 
-        # Execute the action
+        # Dispatch: build args from registry and execute
         t0 = time.time()
         result = {}
         try:
-            if action == "general":
-                sub_task = plan.get("task", "")
-                print(f"  [step {step}] general: {sub_task[:200]}", file=sys.stderr)
+            # Build context for auto-filled params
+            gen_context = f"<task>{task}</task>"
+            if analysis:
+                gen_context += f"\n<analysis>{analysis}</analysis>"
+            if extracted_data:
+                gen_context += (
+                    f"\n\n<extracted_screen_data>\n"
+                    f"USE THIS DATA — do NOT use your own knowledge or hardcode data.\n\n"
+                    f"{extracted_data}\n"
+                    f"</extracted_screen_data>"
+                )
 
-                gen_context = f"<task>{task}</task>"
-                if analysis:
-                    gen_context += f"\n<analysis>{analysis}</analysis>"
-                if extracted_data:
-                    gen_context += (
-                        f"\n\n<extracted_screen_data>\n"
-                        f"The following data was extracted from the browser screen by scrolling through it. "
-                        f"USE THIS DATA — do NOT use your own knowledge or hardcode data.\n\n"
-                        f"{extracted_data}\n"
-                        f"</extracted_screen_data>"
-                    )
-                result = general_action(sub_task=sub_task, task_context=gen_context, runtime=rt)
+            dispatch_context = {
+                "task": task,
+                "img_path": img_path,
+                "app_name": app_name,
+                "task_context": gen_context,
+            }
 
-                # After execution, verify: if this task involved web scraping,
-                # check if the web data was actually accessible.
-                # Skip check if we have extracted_data (agent is using screen-extracted data, not web scraping)
-                if result.get("success") and not extracted_data:
-                    web_blocked = _check_web_access_needed(sub_task)
-                    if web_blocked:
-                        print(f"  [step {step}] post-check: web data was not accessible ({web_blocked}), overriding to FAIL", file=sys.stderr)
-                        result = {
-                            "success": False,
-                            "output": f"The command-line approach appeared to succeed but the web data was NOT actually accessible ({web_blocked}). "
-                                      "The data written is likely fabricated from LLM knowledge, not from the real website. "
-                                      "You MUST use the browser GUI (scroll down to load content, read from screen) to get real data from the website.",
-                        }
-            elif action in GUI_ACTIONS:
-                result = _execute_gui_action(
-                    action, plan, task, img_path, app_name, rt)
-            elif action in DIRECT_ACTIONS:
-                result = _execute_direct_action(action, plan)
+            if action_name in available:
+                spec = available[action_name]
+                func = spec["function"]
+                # Merge LLM args + context args + runtime
+                args = dict(plan.get("args", {}))
+                # Also accept flat plan keys for backward compatibility
+                for key in spec.get("input", {}):
+                    if key not in args and key in plan:
+                        args[key] = plan[key]
+                # Fill context params
+                for key, info in spec.get("input", {}).items():
+                    if info.get("source") == "context" and key not in args:
+                        if key in dispatch_context:
+                            args[key] = dispatch_context[key]
+                # Inject runtime if needed
+                import inspect
+                sig = inspect.signature(func)
+                if "runtime" in sig.parameters and "runtime" not in args:
+                    args["runtime"] = rt
+                # Filter to valid params only
+                valid_params = set(sig.parameters.keys())
+                args = {k: v for k, v in args.items() if k in valid_params}
+                result = func(**args)
             else:
                 # Unknown action — treat as general
-                sub_task = plan.get("task", plan.get("target", plan.get("code", "")))
-                gen_context = f"<task>{task}</task>"
-                if analysis:
-                    gen_context += f"\n<analysis>{analysis}</analysis>"
+                sub_task = plan.get("task", plan.get("target", str(plan)[:200]))
                 result = general_action(sub_task=sub_task, task_context=gen_context, runtime=rt)
+
+            # Post-check for general actions: verify web data was accessible
+            if action_name == "general" and result.get("success") and not extracted_data:
+                sub_task = plan.get("args", plan).get("sub_task", plan.get("task", ""))
+                web_blocked = _check_web_access_needed(sub_task)
+                if web_blocked:
+                    print(f"  [step {step}] post-check: web data was not accessible ({web_blocked}), overriding to FAIL", file=sys.stderr)
+                    result = {
+                        "success": False,
+                        "output": f"Web data was NOT actually accessible ({web_blocked}). "
+                                  "You MUST use the browser GUI to get real data from the website.",
+                    }
         except Exception as e:
             print(f"  [step {step}] Execute ERROR: {e.__class__.__name__}", file=sys.stderr)
             if hasattr(rt, '_inner') and hasattr(rt._inner, 'reset'):

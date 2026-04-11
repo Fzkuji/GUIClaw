@@ -239,11 +239,7 @@ Known UI components (labeled, with coordinates):
 {comp_lines}
 
 OCR text on screen:
-{text_lines}
-
-If the target is in the lists above, return its coordinates.
-If not found, return {{"found": false}}.
-Return ONLY valid JSON."""
+{text_lines}"""
 
     reply = rt.exec(content=[{"type": "text", "text": context}])
 
@@ -704,11 +700,7 @@ def select_transition(
 Current state: {current_state}
 
 Known transitions from this state:
-{trans_lines}
-
-Select the transition that best advances the task.
-If none are relevant, return {{"selected": false}}.
-Return ONLY valid JSON."""
+{trans_lines}"""
 
     reply = rt.exec(content=[{"type": "text", "text": context}])
 
