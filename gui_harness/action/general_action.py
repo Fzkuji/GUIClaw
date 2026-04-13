@@ -14,16 +14,6 @@ from __future__ import annotations
 
 from agentic import agentic_function
 
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
-
 
 @agentic_function(summarize={"depth": 0, "siblings": 0})
 def general_action(sub_task: str, task_context: str = "", runtime=None) -> dict:
@@ -58,7 +48,9 @@ def general_action(sub_task: str, task_context: str = "", runtime=None) -> dict:
     """
     from gui_harness.utils import parse_json
 
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("general_action() requires a runtime argument")
+    rt = runtime
 
     # Build data with VM access info
     data_parts = []

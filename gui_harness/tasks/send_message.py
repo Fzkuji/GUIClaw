@@ -9,16 +9,6 @@ from __future__ import annotations
 
 from agentic import agentic_function
 
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
-
 
 @agentic_function(compress=True)
 def send_message(app_name: str, recipient: str, message: str,
@@ -38,7 +28,7 @@ def send_message(app_name: str, recipient: str, message: str,
         app_name:  Messaging app (e.g., "WeChat", "Discord", "Telegram").
         recipient: Name of the recipient/contact.
         message:   Message text to send.
-        runtime:   Optional: Runtime instance.
+        runtime:   Runtime instance (required).
 
     Returns:
         dict with keys: app_name, recipient, message, success, evidence
@@ -48,7 +38,9 @@ def send_message(app_name: str, recipient: str, message: str,
     from gui_harness.planning.navigate import navigate
     from gui_harness.planning.verify import verify
 
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("send_message() requires a runtime argument")
+    rt = runtime
 
     # 1. Observe
     obs = observe(task=f"Find conversation with {recipient} in {app_name}",

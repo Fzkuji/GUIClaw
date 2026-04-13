@@ -1,11 +1,11 @@
 """
-gui_harness.create — dynamically create new GUI automation functions.
+gui_harness.planning.create — dynamically create new GUI automation functions.
 
-Wraps agentic.meta_function.create() with GUI-specific context:
+Wraps agentic.meta_functions.create() with GUI-specific context:
 available primitives, coordinate rules, and examples.
 
 Usage:
-    from gui_harness.create import create_gui_function
+    from gui_harness.planning.create import create_gui_function
     from gui_harness.runtime import GUIRuntime
 
     runtime = GUIRuntime()
@@ -19,8 +19,7 @@ Usage:
 
 from __future__ import annotations
 
-from agentic.meta_function import create, fix
-from agentic.function import agentic_function
+from agentic.meta_functions import create, fix
 
 # GUI-specific context injected into the create() prompt
 _GUI_CONTEXT = """
@@ -56,7 +55,6 @@ Available GUI primitives (already imported, use directly):
 
     # Existing agentic functions (can call these too)
     from gui_harness.planning.observe import observe
-    from gui_harness.planning.act import act
     from gui_harness.planning.verify import verify
 
 Rules:
@@ -77,24 +75,14 @@ def create_gui_function(description: str, runtime=None, name: str = None):
 
     Args:
         description: What the function should do (natural language).
-        runtime:     GUIRuntime instance.
+        runtime:     GUIRuntime instance (required).
         name:        Optional function name override.
 
     Returns:
         A callable @agentic_function.
-
-    Example:
-        scroll_fn = create_gui_function(
-            "Scroll down in the active window 3 times, "
-            "take a screenshot after each scroll, "
-            "and return the OCR text from each screenshot",
-            runtime=runtime,
-        )
-        result = scroll_fn()
     """
     if runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        runtime = GUIRuntime()
+        raise ValueError("create_gui_function() requires a runtime argument")
 
     full_description = f"{description}\n\n{_GUI_CONTEXT}"
 
@@ -108,9 +96,6 @@ def create_gui_function(description: str, runtime=None, name: str = None):
     import gui_harness.perception.template_match as _tm
     import time
 
-    # The generated function runs in a sandbox with limited builtins.
-    # We need to make primitives available. Since create() uses exec()
-    # with a restricted namespace, we patch the function's globals.
     if hasattr(fn, '_fn') and hasattr(fn._fn, '__globals__'):
         fn._fn.__globals__.update({
             'screenshot': _ss,
@@ -132,15 +117,14 @@ def fix_gui_function(fn, runtime=None, instruction: str = None, **kwargs):
 
     Args:
         fn:          The broken @agentic_function to fix.
-        runtime:     GUIRuntime instance.
+        runtime:     GUIRuntime instance (required).
         instruction: Optional manual fix instruction.
 
     Returns:
         A new fixed @agentic_function.
     """
     if runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        runtime = GUIRuntime()
+        raise ValueError("fix_gui_function() requires a runtime argument")
 
     full_instruction = instruction or ""
     full_instruction += f"\n\n{_GUI_CONTEXT}"

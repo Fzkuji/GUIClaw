@@ -9,16 +9,6 @@ from __future__ import annotations
 
 from agentic import agentic_function
 
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
-
 
 @agentic_function(compress=True)
 def read_messages(app_name: str, contact: str = None,
@@ -34,7 +24,7 @@ def read_messages(app_name: str, contact: str = None,
     Args:
         app_name: Messaging app (e.g., "WeChat", "Discord", "Telegram").
         contact:  Optional: specific contact/channel to read from.
-        runtime:  Optional: Runtime instance.
+        runtime:  Runtime instance (required).
 
     Returns:
         dict with keys: app_name, contact, messages, screenshot_path, success
@@ -42,7 +32,9 @@ def read_messages(app_name: str, contact: str = None,
     from gui_harness.planning.observe import observe
     from gui_harness.planning.navigate import navigate
 
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("read_messages() requires a runtime argument")
+    rt = runtime
 
     # Navigate if contact specified
     if contact:

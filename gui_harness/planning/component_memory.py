@@ -160,7 +160,7 @@ def _update_activity(app_dir: Path, matched_names: set[str]):
     components_dir = app_dir / "components"
     for name in to_delete:
         # Remove icon file
-        icon_file = comp.get("icon_file", "")
+        icon_file = components[name].get("icon_file", "")
         if icon_file:
             icon_path = app_dir / icon_file
             if icon_path.exists():
@@ -218,9 +218,10 @@ def find_target_in_known(
     }
     """
     from gui_harness.utils import parse_json
-    from gui_harness.runtime import GUIRuntime
 
-    rt = runtime or GUIRuntime()
+    if runtime is None:
+        raise ValueError("find_target_in_known() requires a runtime argument")
+    rt = runtime
 
     comp_lines = "\n".join(
         f"  [{c['name']}] at ({c['cx']}, {c['cy']}) conf={c.get('confidence', 0):.2f}"
@@ -279,9 +280,10 @@ def label_single_component(
     }
     """
     from gui_harness.utils import parse_json
-    from gui_harness.runtime import GUIRuntime
 
-    rt = runtime or GUIRuntime()
+    if runtime is None:
+        raise ValueError("label_single_component() requires a runtime argument")
+    rt = runtime
 
     context = f"""Task: {task}
 Target element: {target}
@@ -690,9 +692,10 @@ def select_transition(
     }
     """
     from gui_harness.utils import parse_json
-    from gui_harness.runtime import GUIRuntime
 
-    rt = runtime or GUIRuntime()
+    if runtime is None:
+        raise ValueError("select_transition() requires a runtime argument")
+    rt = runtime
 
     trans_lines = "\n".join(
         f"  [{i}] {t['action']}:{t['target']} → state {t['to_state']} (used {t['use_count']}x)"

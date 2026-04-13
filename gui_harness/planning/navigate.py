@@ -1,5 +1,5 @@
 """
-gui_harness.functions.navigate — navigate through an app's state graph.
+gui_harness.planning.navigate — navigate through an app's state graph.
 
 navigate() is an @agentic_function(compress=True) that:
   1. Identifies the current app state
@@ -12,19 +12,11 @@ from __future__ import annotations
 
 import sys
 from collections import deque
-from pathlib import Path
 
 from agentic import agentic_function
 
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
+from gui_harness.memory import app_memory
+from gui_harness.planning.component_memory import match_memory_components
 
 
 @agentic_function(compress=True)
@@ -41,7 +33,7 @@ def navigate(target_state: str, app_name: str,
     Args:
         target_state: The state name to navigate to.
         app_name:     App to navigate in.
-        runtime:      Optional: Runtime instance.
+        runtime:      Runtime instance (required).
         max_steps:    Maximum actions to take (default: 10).
 
     Returns:
@@ -52,30 +44,29 @@ def navigate(target_state: str, app_name: str,
     from gui_harness.planning.act import act
     from gui_harness.planning.verify import verify
 
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("navigate() requires a runtime argument")
+    rt = runtime
 
     # Load state graph
     states, transitions, start_state = {}, {}, "unknown"
     try:
-        _SCRIPTS_DIR = str(Path(__file__).parent.parent.parent / "scripts")
-        if _SCRIPTS_DIR not in sys.path:
-            sys.path.insert(0, _SCRIPTS_DIR)
-        from app_memory import (
-            get_app_dir, load_states, load_transitions,
-            identify_state_by_components, load_components, quick_template_check
-        )
-        app_dir = get_app_dir(app_name)
+        app_dir = app_memory.get_app_dir(app_name)
         if app_dir:
-            states = load_states(app_dir) or {}
-            try:
-                transitions = load_transitions(app_dir) or {}
-            except Exception:
-                pass
-            components = load_components(app_dir)
-            comp_names = [c["name"] for c in components if "name" in c]
-            matched_names, _, _ = quick_template_check(app_dir, comp_names)
-            state_name, _ = identify_state_by_components(app_name, list(matched_names))
-            start_state = state_name or "unknown"
+            states = app_memory.load_states(app_dir) or {}
+            transitions = app_memory.load_transitions(app_dir) or {}
+            components = app_memory.load_components(app_dir)
+            # Identify current state from visible components
+            from gui_harness.perception import screenshot
+            img_path = screenshot.take()
+            matched = match_memory_components(app_name, img_path)
+            matched_names = {c["name"] for c in matched}
+            if matched_names:
+                state_id, _ = app_memory.identify_or_create_state(
+                    states, matched_names, components
+                )
+                start_state = state_id or "unknown"
+                app_memory.save_states(app_dir, states)
     except Exception:
         pass
 
@@ -111,9 +102,9 @@ def navigate(target_state: str, app_name: str,
         if steps >= max_steps:
             break
 
-        trans_key = f"{current_state}→{next_state}"
+        trans_key = f"{current_state}|{next_state}"
         action_info = transitions.get(trans_key, {})
-        click_target = action_info.get("click_component", next_state)
+        click_target = action_info.get("target", next_state)
 
         act(action="click", target=click_target, app_name=app_name, runtime=rt)
         steps += 1
@@ -139,9 +130,10 @@ def _bfs_path(states: dict, transitions: dict, start: str, target: str) -> list[
         return [start]
 
     adj: dict[str, list[str]] = {}
-    for key in transitions:
-        if "→" in key:
-            src, dst = key.split("→", 1)
+    for key, trans in transitions.items():
+        src = trans.get("from", "")
+        dst = trans.get("to", "")
+        if src and dst:
             adj.setdefault(src, []).append(dst)
 
     queue: deque = deque([(start, [start])])

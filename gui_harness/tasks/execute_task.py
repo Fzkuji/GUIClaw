@@ -6,7 +6,7 @@ Design principle:
   We only enforce HOW for things the LLM can't do well (GUI clicking).
 
 Architecture:
-  gui_agent(task)        <- @agentic_function, ONE step per call
+  gui_agent(task)        <- @agentic_function in main.py, single entry point
     1. Screenshot + detect components
     2. LLM decides what to do (decide_next_action)
     3. Execute the action (dispatch)
@@ -195,38 +195,22 @@ def _build_action_registry():
         },
     }
 
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
-
 
 # ═══════════════════════════════════════════
-# gui_agent — single step @agentic_function
+# _gui_step — single step implementation (called by gui_agent in main.py)
 # ═══════════════════════════════════════════
 
-@agentic_function(compress=True, summarize={"siblings": -1})
-def gui_agent(task: str, runtime=None) -> dict:
-    """Autonomous GUI agent. Execute one step of a GUI task.
+def _gui_step(task: str, runtime=None) -> dict:
+    """Execute one step of a GUI task.
 
     Takes a screenshot, detects UI components, asks the LLM what to do,
     then executes the chosen action. Returns the result.
 
-    The caller is responsible for looping until done.
-
-    Args:
-        task: What to do, in natural language.
-        runtime: LLM runtime instance.
-
-    Returns:
-        dict with: action, success, done, and action-specific fields.
+    Called by gui_agent() in main.py.
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("_gui_step() requires a runtime argument")
+    rt = runtime
     timing = {}
 
     # 1. Screenshot
@@ -332,7 +316,7 @@ def gui_agent(task: str, runtime=None) -> dict:
 
 
 # ═══════════════════════════════════════════
-# LLM decision function (called by gui_agent)
+# LLM decision function (called by _gui_step)
 # ═══════════════════════════════════════════
 
 @agentic_function(summarize={"depth": 0, "siblings": 0})
@@ -360,7 +344,9 @@ def decide_next_action(
 
     Choose one action from the available list and return the corresponding JSON.
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("decide_next_action() requires a runtime argument")
+    rt = runtime
 
     sys_ctx = f"\n{system_context}" if system_context else ""
 
@@ -395,14 +381,16 @@ def execute_task(task: str, runtime=None, max_steps: int = 30, app_name: str = "
 
     Args:
         task:       Natural language description of what to do.
-        runtime:    GUIRuntime instance (auto-detected if None).
+        runtime:    GUIRuntime instance (required).
         max_steps:  Maximum number of actions (default: 30).
         app_name:   App name for component memory (default: "desktop").
 
     Returns:
         dict: task, success, steps_taken, total_time, history
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("execute_task() requires a runtime argument")
+    rt = runtime
 
     # Reset runtime
     if hasattr(rt, '_inner') and hasattr(rt._inner, 'reset'):
@@ -437,6 +425,8 @@ def _ensure_base_memory(app_name: str, rt) -> None:
 
 def _execute_task_loop(task, rt, max_steps, app_name):
     """Internal task loop."""
+    from gui_harness.main import gui_agent
+
     history = []
     completed = False
     task_start = time.time()
@@ -523,7 +513,9 @@ def _extract_screen_data(task: str, img_path: str, existing_data: str, runtime=N
     - If this is a continuation, only extract NEW items not in previous data
     - If nothing relevant is visible, return "NO_DATA"
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("_extract_screen_data() requires a runtime argument")
+    rt = runtime
 
     content_parts = [
         {"type": "text", "text": f"Task: {task}"},

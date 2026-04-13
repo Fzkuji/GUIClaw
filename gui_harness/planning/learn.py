@@ -28,17 +28,6 @@ from gui_harness.perception import screenshot, detector
 from gui_harness.memory import app_memory
 
 
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
-
-
 def has_base_memory(app_name: str) -> bool:
     """Check if an app already has base memory from a previous learn."""
     app_dir = app_memory.get_app_dir(app_name)
@@ -72,7 +61,9 @@ def learn_app_components(
         {"app_name": str, "components_saved": int, "components_skipped": int,
          "timing": {"detect": float, "label": float, "save": float}}
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("This function requires a runtime argument")
+    rt = runtime
 
     # Check existing base memory
     if not force and has_base_memory(app_name):
@@ -243,7 +234,9 @@ def _batch_label(
     Returns:
         Dict mapping str(index) to label name.
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("This function requires a runtime argument")
+    rt = runtime
 
     # Build component list text
     comp_lines = []

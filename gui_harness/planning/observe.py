@@ -6,22 +6,11 @@ Session mode: summarize={"depth": 0, "siblings": 0}
 
 from __future__ import annotations
 
-import json
 from gui_harness.utils import parse_json
 
 from agentic import agentic_function
 from gui_harness.perception import screenshot, ocr, detector
 from gui_harness.action.input import get_frontmost_app
-
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
 
 
 @agentic_function(summarize={"depth": 0, "siblings": 0})
@@ -52,7 +41,9 @@ def observe(task: str, app_name: str = None, runtime=None) -> dict:
       "screenshot_path": "..."
     }
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("observe() requires a runtime argument")
+    rt = runtime
 
     if not app_name:
         app_name = get_frontmost_app()
@@ -108,12 +99,3 @@ Detected UI elements (click-space coordinates):
         }
 
     return result
-
-
-def parse_json(reply: str) -> dict:
-    text = reply.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-    return json.loads(text)

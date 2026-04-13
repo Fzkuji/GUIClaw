@@ -6,21 +6,10 @@ Session mode: summarize={"depth": 0, "siblings": 0}
 
 from __future__ import annotations
 
-import json
 from gui_harness.utils import parse_json
 
 from agentic import agentic_function
 from gui_harness.perception import screenshot, ocr
-
-_runtime = None
-
-
-def _get_runtime():
-    global _runtime
-    if _runtime is None:
-        from gui_harness.runtime import GUIRuntime
-        _runtime = GUIRuntime()
-    return _runtime
 
 
 @agentic_function(summarize={"depth": 0, "siblings": 0})
@@ -42,7 +31,9 @@ def verify(expected: str, runtime=None) -> dict:
       "screenshot_path": "..."
     }
     """
-    rt = runtime or _get_runtime()
+    if runtime is None:
+        raise ValueError("verify() requires a runtime argument")
+    rt = runtime
 
     img_path = screenshot.take()
     ocr_results = ocr.detect_text(img_path)
@@ -70,12 +61,3 @@ OCR text on screen:
             "screenshot_path": img_path,
         }
     return result
-
-
-def parse_json(reply: str) -> dict:
-    text = reply.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-    return json.loads(text)
