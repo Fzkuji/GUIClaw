@@ -110,16 +110,16 @@
 | 89 | `42f4d1c7` | VS Code + GIMP scripting | **1.0** | ✅ GUI安装mattn.lisp扩展+Script-Fu resize脚本，11步。系统代理修复后联网成功 |
 | 90 | `3c8f201a` | Download + compress image | **1.0** | 下载+压缩图片到600KB以下，15步2067秒 |
 | 91 | `d68204bf` | Divide image into sections | | |
-| 92 | `91190194` | GIMP crop top 20% | | |
+| 92 | `91190194` | GIMP crop top 20% | **1.0** | ✅ PIL裁剪顶部20%，2步87秒 |
 | 93 | `7f35355e` | CSV + find median price | | |
-| 94 | `98e8e339` | Merge txt files to docx | | |
-| 95 | `0e5303d4` | Clone Python course repo | | |
+| 94 | `98e8e339` | Merge txt files to docx | **1.0** | ✅ 合并txt到docx，3步260秒 |
+| 95 | `0e5303d4` | Clone Python course repo | **1.0** | ✅ 克隆课程仓库，2步131秒 |
 | 96 | `df67aebb` | Paper bibliography | | |
-| 97 | `5df7b33a` | Split bulky book | | |
-| 98 | `aceb0368` | Grade English exam | | |
+| 97 | `5df7b33a` | Split bulky book | **0.996** | ⚠️ 分割书籍，2步116秒 |
+| 98 | `aceb0368` | Grade English exam | **1.0** | ✅ 批改选择题+写入xlsx，7步293秒 |
 | 99 | `22a4636f` | Convert docx to PDF + upload | | |
 | 100 | `236833a3` | HuggingFace daily paper list | | |
-| 101 | `67890eb6` | ACL best paper awards | | |
+| 101 | `67890eb6` | ACL best paper awards | **1.0** | ✅ 爬取ACL 2019-2023最佳长论文奖，3步286秒 |
 
 ## Legend
 - **Bold score** = Verified by official OSWorld evaluator
