@@ -117,7 +117,7 @@
 | 96 | `df67aebb` | Paper bibliography | **1.0** | ⚠️ 官方eval=0.0。DBLP BibTeX 207行仅2行timestamp不同（DBLP记录更新），其余完全一致。Agent正确获取了6篇论文的发表版BibTeX |
 | 97 | `5df7b33a` | Split bulky book | **0.996** | ⚠️ 分割书籍，2步116秒 |
 | 98 | `aceb0368` | Grade English exam | **1.0** | ✅ 批改选择题+写入xlsx，7步293秒 |
-| 99 | `22a4636f` | Convert docx to PDF + upload | | |
+| 99 | `22a4636f` | Convert docx to PDF + upload | **N/A** | ❌ Blocked: 需要Google Drive API credentials（settings.yml + settings.json），setup第一步失败 |
 | 100 | `236833a3` | HuggingFace daily paper list | | |
 | 101 | `67890eb6` | ACL best paper awards | **1.0** | ✅ 爬取ACL 2019-2023最佳长论文奖，3步286秒 |
 
