@@ -28,15 +28,17 @@ VM_PORT = 5000
 VMRUN = "/Applications/VMware Fusion.app/Contents/Public/vmrun"
 VMX = os.path.expanduser("~/OSWorld/vmware_vm_data/Ubuntu-arm/Ubuntu.vmx")
 
-def get_task_config(task_num: int) -> dict:
+def get_task_config(task_num: int, domain: str = "multi_apps") -> dict:
     """Load task config from OSWorld evaluation_examples."""
     test_all = json.load(open(os.path.join(OSWORLD_DIR, "evaluation_examples/test_all.json")))
-    task_ids = test_all.get("multi_apps", [])
+    task_ids = test_all.get(domain, [])
+    if not task_ids:
+        raise ValueError(f"Domain '{domain}' not found. Available: {list(test_all.keys())}")
     if task_num < 1 or task_num > len(task_ids):
         raise ValueError(f"Task {task_num} out of range (1-{len(task_ids)})")
 
     tid = task_ids[task_num - 1]
-    files = glob.glob(os.path.join(OSWORLD_DIR, f"evaluation_examples/examples/multi_apps/{tid}*.json"))
+    files = glob.glob(os.path.join(OSWORLD_DIR, f"evaluation_examples/examples/{domain}/{tid}*.json"))
     if not files:
         raise FileNotFoundError(f"Task config not found for {tid}")
 
@@ -270,22 +272,25 @@ def print_result(result: dict, task_num: int, score: float = None):
         timing = h.get("timing", {})
         step_t = timing.get("step_total", "?")
         output = str(h.get("output", ""))[:120]
-        print(f"  {h['step']:2d}. [{status}] {h['action']:15s} ({step_t}s)")
+        plan = h.get("plan", {})
+        action = plan.get("call", plan.get("action", "?"))
+        print(f"  {h['step']:2d}. [{status}] {str(action):15s} ({step_t}s)")
         if output.strip():
             print(f"      output: {output}")
     print("=" * 60)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run OSWorld multi_apps task")
+    parser = argparse.ArgumentParser(description="Run OSWorld task")
     parser.add_argument("task_num", type=int, help="Task number (1-indexed)")
+    parser.add_argument("--domain", default="multi_apps", help="OSWorld domain (e.g., chrome, gimp, os, libreoffice_calc, multi_apps)")
     parser.add_argument("--vm", default="172.16.82.132", help="VM IP address")
     parser.add_argument("--max-steps", type=int, default=15, help="Max steps")
     parser.add_argument("--no-setup", action="store_true", help="Skip VM reset")
     parser.add_argument("--no-eval", action="store_true", help="Skip official evaluation")
     args = parser.parse_args()
 
-    task_config = get_task_config(args.task_num)
+    task_config = get_task_config(args.task_num, args.domain)
     task_id = task_config["id"][:8]
     print(f"Task {args.task_num} ({task_id}): {task_config['instruction'][:80]}...")
     print(f"Apps: {task_config.get('related_apps')} | Proxy: {task_config.get('proxy')}")
@@ -330,7 +335,7 @@ def main():
         eval_script = os.path.join(here, "eval_osworld_task.py")
         print("\n[eval] Running official evaluator...")
         subprocess.run(
-            [sys.executable, eval_script, str(args.task_num), "--vm", args.vm],
+            [sys.executable, eval_script, str(args.task_num), "--domain", args.domain, "--vm", args.vm],
             capture_output=False,
         )
 
