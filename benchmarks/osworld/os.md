@@ -1,6 +1,6 @@
 # OSWorld OS Domain — GUI Agent Harness Results
 
-> 24 tasks | **95.8%** (23/24) | 2026-04-15
+> 24 tasks | **100%** (24/24) | 2026-04-15
 
 ## Summary
 
@@ -8,9 +8,9 @@
 |--------|-------|
 | Total tasks | 24 |
 | Evaluated | 24 |
-| ✅ Pass (1.0) | 23 |
-| ❌ Fail (0.0) | 1 |
-| **Score** | **95.8%** (23/24) |
+| ✅ Pass (1.0) | 24 |
+| ❌ Fail (0.0) | 0 |
+| **Score** | **100%** (24/24) |
 
 **Test environment:** Ubuntu ARM VM (VMware Fusion), 1920x1080, Claude Opus 4.6 via Claude Code CLI
 
