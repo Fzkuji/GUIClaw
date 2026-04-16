@@ -234,7 +234,7 @@ def _observe(app_name: str) -> dict:
     t_match = round(time.time() - t0, 2)
 
     # State identification (Jaccard similarity against known states)
-    current_state = identify_state(app_name, matched_names)
+    current_state, _ = identify_state(app_name, img_path)
 
     # Known transitions from current state
     transitions = get_available_transitions(app_name, current_state) if current_state else []
@@ -661,6 +661,45 @@ def build_step_feedback(result: dict) -> dict:
         feedback["prev_observation"] = verification.get("observation", "")
 
     return feedback
+
+
+# ═══════════════════════════════════════════
+# conclusion — LLM summarizes the task result
+# ═══════════════════════════════════════════
+
+@agentic_function(summarize={"depth": 0, "siblings": 0})
+def conclusion(task: str, completed: bool, steps_taken: int, runtime=None) -> dict:
+    """Summarize what was accomplished during the GUI task.
+
+    Look at the current screen and provide a brief summary of:
+    1. What was done
+    2. Whether the task was completed successfully
+    3. Any issues encountered
+
+    Return JSON:
+    {
+      "summary": "brief description of what was accomplished",
+      "success": true/false,
+      "issues": "any problems encountered, or null"
+    }
+    """
+    if runtime is None:
+        raise ValueError("conclusion() requires a runtime argument")
+
+    img_path = _screenshot.take()
+
+    status = "COMPLETED" if completed else f"INCOMPLETE (used all {steps_taken} steps)"
+    context = f"<task>{task}</task>\n\nStatus: {status}\nSteps used: {steps_taken}"
+
+    reply = runtime.exec(content=[
+        {"type": "text", "text": context},
+        {"type": "image", "path": img_path},
+    ])
+
+    try:
+        return parse_json(reply)
+    except Exception:
+        return {"summary": reply[:500], "success": completed, "issues": None}
 
 
 # ═══════════════════════════════════════════

@@ -71,7 +71,7 @@ def gui_agent(task: str, max_steps: int = 15, app_name: str = "desktop", runtime
         raise ValueError("gui_agent() requires a runtime argument")
 
     from gui_harness.tasks.execute_task import (
-        gui_step, build_step_feedback, save_workflow_record,
+        gui_step, build_step_feedback, save_workflow_record, conclusion,
     )
     from gui_harness.planning.learn import has_base_memory, learn_app_components
 
@@ -136,11 +136,27 @@ def gui_agent(task: str, max_steps: int = 15, app_name: str = "desktop", runtime
         # Build feedback for next iteration
         feedback = build_step_feedback(result)
 
+    # ── Conclusion: LLM summarizes the result ──
+    print(f"  [conclusion] ...", file=sys.stderr)
+    try:
+        summary = conclusion(
+            task=task,
+            completed=completed,
+            steps_taken=len(history),
+            runtime=runtime,
+        )
+        print(f"  [conclusion] {summary.get('summary', '')[:80]}", file=sys.stderr)
+    except Exception as e:
+        print(f"  [conclusion] ERROR: {e}", file=sys.stderr)
+        summary = {"summary": str(e), "success": completed, "issues": None}
+
     # ── Teardown ──
     total_time = round(time.time() - task_start, 2)
     final = {
         "task": task,
-        "success": completed,
+        "success": summary.get("success", completed),
+        "summary": summary.get("summary", ""),
+        "issues": summary.get("issues"),
         "steps_taken": len(history),
         "total_time": total_time,
         "history": history,
