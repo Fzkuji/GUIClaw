@@ -37,6 +37,10 @@ from gui_harness.constants import GUI_SYSTEM_PROMPT
             "placeholder": "e.g. Open Firefox and go to google.com",
             "multiline": True,
         },
+        "work_dir": {
+            "description": "Absolute path for any files the agent writes (screenshots, workflow records, scratch). Runtime's codex --cd target, so relative paths the LLM issues land here.",
+            "placeholder": "/Users/you/.openprogram/gui_work",
+        },
         "max_steps": {
             "description": "Maximum number of actions before giving up",
             "options": ["5", "10", "15", "30"],
@@ -48,7 +52,13 @@ from gui_harness.constants import GUI_SYSTEM_PROMPT
         "runtime": {"hidden": True},
     },
 )
-def gui_agent(task: str, max_steps: int = 15, app_name: str = "desktop", runtime=None) -> dict:
+def gui_agent(
+    task: str,
+    work_dir: str,
+    max_steps: int = 15,
+    app_name: str = "desktop",
+    runtime=None,
+) -> dict:
     """Autonomous GUI agent. Execute a GUI task by looping observe -> verify -> plan -> action.
 
     Takes a task description, then autonomously:
@@ -64,6 +74,9 @@ def gui_agent(task: str, max_steps: int = 15, app_name: str = "desktop", runtime
 
     Args:
         task: What to do, in natural language.
+        work_dir: Absolute path for files the agent writes (screenshots,
+                  workflow records, scratch). Runtime's codex runs with this
+                  as cwd so relative paths do not leak into other repos.
         max_steps: Maximum number of actions (default: 15).
         app_name: App name for component memory (default: "desktop").
         runtime: LLM runtime instance.
@@ -73,6 +86,10 @@ def gui_agent(task: str, max_steps: int = 15, app_name: str = "desktop", runtime
     """
     if runtime is None:
         raise ValueError("gui_agent() requires a runtime argument")
+
+    work_dir = os.path.abspath(os.path.expanduser(work_dir))
+    os.makedirs(work_dir, exist_ok=True)
+    runtime.set_workdir(work_dir)
 
     from gui_harness.tasks.execute_task import (
         gui_step, build_step_feedback, save_workflow_record, conclusion,
@@ -177,6 +194,8 @@ def gui_agent(task: str, max_steps: int = 15, app_name: str = "desktop", runtime
 def main():
     parser = argparse.ArgumentParser(description="GUI Agent — autonomous GUI task execution")
     parser.add_argument("task", help="What to do (natural language)")
+    parser.add_argument("--work-dir", required=True,
+                        help="Absolute path for agent file writes (runtime's codex --cd target).")
     parser.add_argument("--vm", help="VM HTTP API URL (for OSWorld)")
     parser.add_argument("--provider", help="Force LLM provider: openclaw, claude-code, anthropic, openai")
     parser.add_argument("--model", help="Override model name")
@@ -201,7 +220,7 @@ def main():
     print()
 
     # Execute
-    result = gui_agent(task=args.task, max_steps=args.max_steps, app_name=args.app, runtime=runtime)
+    result = gui_agent(task=args.task, work_dir=args.work_dir, max_steps=args.max_steps, app_name=args.app, runtime=runtime)
 
     # Report
     print()
