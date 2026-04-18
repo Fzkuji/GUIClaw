@@ -332,7 +332,7 @@ def label_unknown_components(
         known_names: Set of component names already matched from memory
         img_path: Path to the full screenshot
         app_name: App name for memory storage
-        runtime: GUIRuntime instance
+        runtime: openprogram Runtime instance
 
     Returns:
         dict with {cx, cy, name} if target found, None otherwise.
@@ -481,7 +481,7 @@ def locate_target(
         target: Description of the element to locate
         img_path: Path to the current screenshot
         app_name: App name for memory lookup/storage
-        runtime: GUIRuntime instance
+        runtime: openprogram Runtime instance
 
     Returns:
         dict with {cx, cy, name, timing} if found, None if not found.

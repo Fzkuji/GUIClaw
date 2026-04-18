@@ -19,6 +19,12 @@ detected/
 __pycache__/
 *.pyc
 
+# Local virtual environments
+.venv/
+.venv311/
+.venv312/
+venv/
+
 # macOS
 .DS_Store
 

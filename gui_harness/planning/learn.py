@@ -54,7 +54,7 @@ def learn_app_components(
         app_name: Name of the app (e.g., "firefox", "libreoffice_calc")
         img_path: Screenshot path. None = auto-capture from VM or local.
         batch_size: Max components per LLM call (default 50).
-        runtime: GUIRuntime instance.
+        runtime: openprogram Runtime instance.
         force: Re-learn even if base memory exists.
 
     Returns:

@@ -103,6 +103,23 @@ cd GUI-Agent-Harness
 pip install -e .
 ```
 
+> **Warning — editable installs bake in absolute paths.** `pip install -e` writes the current project path into a `.pth` file in `site-packages`. If you later rename any parent folder, every `import gui_harness` breaks with `ModuleNotFoundError` until you rerun `pip install -e .` from the new location. The same applies to `openprogram` and to symlinks under `OpenProgram/openprogram/programs/applications/` that point into this repo — recreate them on move.
+>
+> Canonical layout used by this repo's dev setup (as of 2026-04-19):
+>
+> ```
+> ~/Documents/LLM Agent Harness/OpenProgram/              # pip install -e .  (install first)
+> ~/Documents/GUI Agent/GUI-Agent-Harness/                # pip install -e .  (this repo)
+> ~/Documents/Research-Agent-Harness/                     # pip install -e .
+> ```
+>
+> `OpenProgram/openprogram/programs/applications/GUI-Agent-Harness` must be a symlink to this repo's root so OpenProgram skill/application discovery can see `@agentic_function` exports. If folders move, recreate it:
+>
+> ```bash
+> cd "$OPENPROGRAM_DIR/openprogram/programs/applications"
+> rm -f GUI-Agent-Harness && ln -s "$HARNESS_DIR" GUI-Agent-Harness
+> ```
+
 ### Step 2: Set up an LLM provider
 
 GUI Agent Harness needs an LLM to make decisions. Install at least one provider:

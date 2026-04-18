@@ -1,14 +1,14 @@
 """
 gui_harness.planning.create — dynamically create new GUI automation functions.
 
-Wraps agentic.meta_functions.create() with GUI-specific context:
+Wraps openprogram.programs.functions.meta.create() with GUI-specific context:
 available primitives, coordinate rules, and examples.
 
 Usage:
     from gui_harness.planning.create import create_gui_function
-    from gui_harness.runtime import GUIRuntime
+    from openprogram.providers import create_runtime
 
-    runtime = GUIRuntime()
+    runtime = create_runtime(provider="auto")
 
     scroll_and_read = create_gui_function(
         "Scroll down 3 times and read all visible text after each scroll",
@@ -75,7 +75,7 @@ def create_gui_function(description: str, runtime=None, name: str = None):
 
     Args:
         description: What the function should do (natural language).
-        runtime:     GUIRuntime instance (required).
+        runtime:     openprogram Runtime instance (required).
         name:        Optional function name override.
 
     Returns:
@@ -117,7 +117,7 @@ def fix_gui_function(fn, runtime=None, instruction: str = None, **kwargs):
 
     Args:
         fn:          The broken @agentic_function to fix.
-        runtime:     GUIRuntime instance (required).
+        runtime:     openprogram Runtime instance (required).
         instruction: Optional manual fix instruction.
 
     Returns:

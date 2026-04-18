@@ -57,7 +57,7 @@ With Claude Code CLI as the provider, session persistence (`--session-id` + `--c
 
 ## LLM Provider
 
-`GUIRuntime()` auto-detects the best available provider:
+Runtime selection is delegated to OpenProgram. `openprogram.providers.create_runtime()` auto-detects the best available provider:
 
 | Priority | Provider | Cost |
 |----------|----------|------|
@@ -67,17 +67,18 @@ With Claude Code CLI as the provider, session persistence (`--session-id` + `--c
 | 4 | OpenAI API | Per token |
 
 ```python
-runtime = GUIRuntime()                        # auto-detect
-runtime = GUIRuntime(provider="claude-code")  # force Claude Code
-runtime = GUIRuntime(provider="claude-code", model="opus")  # specific model
+from openprogram.providers import create_runtime
+
+runtime = create_runtime(provider="auto")                        # auto-detect
+runtime = create_runtime(provider="claude-code")                 # force Claude Code
+runtime = create_runtime(provider="claude-code", model="opus")   # specific model
 ```
 
 ## Key Files
 
 ```
 gui_harness/
-├── main.py                    # gui_agent() — top-level loop
-├── runtime.py                 # GUIRuntime — provider auto-detection
+├── main.py                    # gui_agent() — top-level loop, uses openprogram.providers.create_runtime
 ├── tasks/
 │   └── execute_task.py        # gui_step, verify_step, plan_next_action, _dispatch
 ├── action/
