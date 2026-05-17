@@ -1,19 +1,19 @@
 # OSWorld Thunderbird Domain - GPT-5.5 Run Errors
 
-> 15 tasks | **44.4%** (4/9 officially scored so far) | started 2026-05-18
+> 15 tasks | **50.0%** (5/10 officially scored so far) | started 2026-05-18
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tasks | 15 |
-| Run so far | 10 |
-| Officially scored | 9 |
-| Pass (1.0) | 4 |
+| Run so far | 11 |
+| Officially scored | 10 |
+| Pass (1.0) | 5 |
 | Numeric fail (0.0) | 5 |
 | Eval error / N/A | 1 |
-| Not reached | 5 |
-| Score so far | 44.4% (4/9) |
+| Not reached | 4 |
+| Score so far | 50.0% (5/10) |
 
 **Test environment:** Ubuntu VM at `172.16.105.130`, 1920x1080, `openai-codex/gpt-5.5` via GUI Agent Harness
 
@@ -44,7 +44,8 @@
 | 8 | 9b7bc335 | Forward every future email received by `anonym-x2024@outlook.com` | 1.0 PASS | 15 | 226s | Created `Forward all mail` filter, matched all messages, selected forward action, entered `anonym-x2024@gmail.com`, and saved it |
 | 9 | d38192b0 | Attach `~/aws-bill.pdf` to the existing AWS bill email draft | 1.0 PASS | 8 | 82s | Opened attachment picker, selected `aws-bill.pdf`, and left the draft open; evaluator helper confirmed the attachment |
 | 10 | a10b69e1 | Create local folders `COMPANY` and `UNIVERSITY` | 1.0 PASS | 9 | 108s | Created both folders under Local Folders; evaluator `ls -R` found both folder files and `.msf` indexes |
-| 11-15 | - | Not reached | - | - | - | Continue from task 11 |
+| 11 | 3f49d2cc | Enable unified folder view for multiple accounts | 1.0 PASS | 6 | 79s | Navigated app menu to View > Folders > Unified Folders; evaluator confirmed `xulstore.json` state |
+| 12-15 | - | Not reached | - | - | - | Continue from task 12 |
 
 ## Error Details
 
@@ -60,25 +61,26 @@
 | 8 | Early model/session failures but task recovered | First three steps failed with `Agent session failed`; later steps built the filter successfully within step budget | PASS; downloaded 143-byte `msgFilterRules.dat` matched expected forwarding rule | `task_8.log` |
 | 9 | Early verifier failures but task recovered | Attachment picker flow succeeded after three verifier `Agent session failed` errors | PASS; evaluator installed helper and reported `Attachment added!` for `aws-bill.pdf` | `task_9.log` |
 | 10 | None significant | Created `COMPANY` and `UNIVERSITY` folders via Local Folders context menu | PASS; evaluator `ls -R` found both folders | `task_10.log` |
+| 11 | Minor verifier failure but task recovered | One verifier `Agent session failed`; setup had HuggingFace SSL retries before recovering | PASS; downloaded `xulstore.json` confirmed unified folder state | `task_11.log` |
 
 ## Error Categories
 
 | Category | Affected tasks | Evidence | Notes |
 |----------|----------------|----------|-------|
-| Opaque model/session failure | 1, 2, 3, 4, 5, 6, 7, 8, 9 | `RuntimeError: Agent session failed` | Triggered immediate execution collapse on tasks 1-2 and slowed later tasks; some tasks recovered before final scoring. |
+| Opaque model/session failure | 1, 2, 3, 4, 5, 6, 7, 8, 9, 11 | `RuntimeError: Agent session failed` | Triggered immediate execution collapse on tasks 1-2 and slowed later tasks; some tasks recovered before final scoring. |
 | Screenshot/read cascade | 1, 2, 4, 7 | `WARNING Image Read Error /tmp/gui_agent_screen.png`; `ValueError: need at least one array to stack` | Started after model/GUI failure or bad window focus. |
 | Invalid image passed to model | 1, 2, 4, 7 | OpenAI HTTP 400: image data is not a valid image | Appeared during conclusion after screenshot read failures. |
 | GUI target drift / wrong window focus | 7 | Star-click targets landed outside Thunderbird and focused GIMP | Caused task 7 to lose the active app before the screenshot cascade. |
 | Output missing | 4 | Evaluator could not find `/home/user/emails.bak` | Export/backup flow did not complete. |
 | Incomplete app configuration | 6 | Evaluator found only a minimal `msgFilterRules.dat` | Local folder was created but message filter rules were not completed. |
-| Runner success after early failures | 5, 8, 9 | Official evaluator returned 1.0 despite early model/session errors | Shows early `Agent session failed` is not always fatal when later steps recover. |
+| Runner success after early failures | 5, 8, 9, 11 | Official evaluator returned 1.0 despite early model/session errors | Shows early `Agent session failed` is not always fatal when later steps recover. |
 | Evaluator setup failure | 1 | Upload failed with status 500: read-only filesystem at `/home/user/Desktop/firefox_decrypt.py` | Separate from runner failure; official score is N/A. |
-| HuggingFace asset download instability | 1, 3, 7 | SSL EOF retries while downloading task assets | Downloads recovered after retries/curl fallback where applicable. |
-| Missing proxy config warning | 1-10 | `evaluation_examples/settings/proxy/dataimpulse.json` not found | Non-blocking so far. |
+| HuggingFace asset download instability | 1, 3, 7, 11 | SSL EOF retries while downloading task assets | Downloads recovered after retries/curl fallback where applicable. |
+| Missing proxy config warning | 1-11 | `evaluation_examples/settings/proxy/dataimpulse.json` not found | Non-blocking so far. |
 
 ## Handoff Notes
 
-- Continue at Thunderbird task 11 in `runs/thunderbird_all_20260518_0442`.
+- Continue at Thunderbird task 12 in `runs/thunderbird_all_20260518_0442`.
 - Official `test_all.json` lists 15 Thunderbird tasks; the older `benchmarks/osworld/thunderbird.md` says 24 and is stale.
 - Treat official evaluator score as benchmark truth. Task 1 has no score because evaluator setup failed after runner failure.
 - Watch for VM filesystem state. Task 1 evaluator could not upload to `/home/user/Desktop/firefox_decrypt.py` due to a read-only filesystem.
