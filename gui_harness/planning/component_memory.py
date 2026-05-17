@@ -200,51 +200,17 @@ def find_target_in_known(
     texts: list[dict],
     runtime=None,
 ) -> dict:
-    """Locate the target element in the provided lists. You are a LOCATOR.
+    """Locate the target in the provided lists.
 
-    Your ONLY job: check whether the target's visible text/role matches any
-    entry in `known_components` or `OCR text`. If yes → return that entry's
-    coordinates. If no → return found=false.
+    Inputs:
+    - target: what to find (natural language)
+    - known_components: UI elements with labels and (cx, cy)
+    - texts: OCR text on screen with (cx, cy)
 
-    You receive:
-    - target: natural-language description of the element to find
-    - known_components: labeled UI elements with exact coordinates
-    - OCR text: all visible text on screen with coordinates
-
-    What `found=true` means:
-      The element's visible text or role appears in one of the two lists.
-      Use THAT list entry's coordinates verbatim. Nothing more.
-
-    What `found=false` means:
-      No list entry's text/role matches the target's text/role.
-
-    `found` is NOT about any of these (ignore them entirely):
-      - Whether clicking this element will accomplish the task
-      - Whether a menu/dialog is in the "right" state
-      - Whether the action will succeed or what happens after
-      - Whether the task as a whole is complete
-      Those decisions belong to the planner — not to you.
-
-    Matching hints:
-      - Strip noise from the target before matching: "at (x, y)",
-        "menu item", "button", "label", "on the left/right", dialog/menu
-        names, etc. Match on the meaningful text (e.g. target
-        "File menu label at (88, 76)" → match OCR 'File' at (87, 76)).
-      - Menu labels in the menu bar (File, Edit, View, Colors, ...) are
-        ALWAYS visible regardless of whether any dropdown is open.
-      - If the target description includes a coordinate, it is only a
-        hint from the planner — the authoritative coordinates are the
-        ones in the lists. Never invent coordinates.
-      - If multiple entries match the text, pick the one whose
-        position/context best fits the target description.
-
-    Return ONLY JSON:
+    Return JSON:
     {
-      "found": true/false,
-      "name": "matched label from the lists",
-      "cx": <x from the matched entry>,
-      "cy": <y from the matched entry>,
-      "reasoning": "which list entry you matched (one short sentence)"
+      "reasoning": "one short sentence — which entry did you pick and why",
+      "name": "..."   // exact label from known_components or OCR text; "" if nothing matches
     }
     """
     from gui_harness.utils import parse_json
@@ -276,19 +242,40 @@ OCR text on screen:
 
     try:
         result = parse_json(reply)
-        if not result.get("found"):
-            reasoning = result.get("reasoning", "(none)")
-            print(
-                f"  [phase3] LLM said found=False. reasoning: {reasoning[:400]}",
-                file=sys.stderr,
-            )
-        return result
     except Exception as _e:
         print(
             f"  [phase3] parse FAILED ({_e.__class__.__name__}); raw reply:\n{reply[:800]}",
             file=sys.stderr,
         )
         return {"found": False, "reasoning": f"Parse failed: {reply[:200]}"}
+
+    reasoning = result.get("reasoning", "")
+    name = (result.get("name") or "").strip()
+
+    lookup: dict[str, tuple[int, int]] = {}
+    for c in known_components:
+        lookup[c["name"]] = (c["cx"], c["cy"])
+    for t in texts[:60]:
+        label = t.get("label", "")
+        if label:
+            lookup[label] = (t.get("cx", 0), t.get("cy", 0))
+
+    if not name or name not in lookup:
+        print(
+            f"  [phase3] name={name!r} not in lists. reasoning: {reasoning[:400]}",
+            file=sys.stderr,
+        )
+        return {"found": False, "reasoning": reasoning}
+
+    cx, cy = lookup[name]
+    if cx <= 0 or cy <= 0:
+        print(
+            f"  [phase3] entry {name!r} has bad coords ({cx},{cy})",
+            file=sys.stderr,
+        )
+        return {"found": False, "reasoning": f"entry {name!r} has bad coords"}
+
+    return {"found": True, "name": name, "cx": cx, "cy": cy, "reasoning": reasoning}
 
 
 # ═══════════════════════════════════════════
@@ -541,6 +528,15 @@ def locate_target(
     _timing["phase1_detect"] = round(time.time() - t0, 2)
     print(f"  [locate] Phase 1: {len(icons)} icons, {len(texts)} texts ({_timing['phase1_detect']}s)", file=sys.stderr)
 
+    coord_hit = _extract_target_coordinates(target, detection["img_w"], detection["img_h"])
+    if coord_hit:
+        coord_hit["timing"] = _timing
+        print(
+            f"  [locate] coordinate fallback: ({coord_hit['cx']}, {coord_hit['cy']})",
+            file=sys.stderr,
+        )
+        return coord_hit
+
     # Diagnostic: dump a preview of OCR texts so we can compare against what
     # Plan referenced and see whether the target's words appear on screen.
     ocr_snippets = [
@@ -611,6 +607,22 @@ def locate_target(
     if found:
         found["timing"] = _timing
     return found
+
+
+def _extract_target_coordinates(target: str, img_w: int, img_h: int) -> Optional[dict]:
+    """Return explicit coordinates embedded in a target string, if valid."""
+    match = re.search(r"\((\d{1,4})\s*,\s*(\d{1,4})\)", target or "")
+    if not match:
+        return None
+    cx, cy = int(match.group(1)), int(match.group(2))
+    if cx <= 0 or cy <= 0 or cx > img_w or cy > img_h:
+        return None
+    return {
+        "cx": cx,
+        "cy": cy,
+        "name": target,
+        "source": "target_coordinates",
+    }
 
 
 # ═══════════════════════════════════════════

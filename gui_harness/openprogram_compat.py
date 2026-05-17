@@ -12,6 +12,7 @@ package refactors in OpenProgram do not force matching changes here.
 from __future__ import annotations
 
 import importlib
+import types
 from typing import Callable
 
 from openprogram import agentic_function
@@ -46,7 +47,39 @@ def create_runtime(provider: str | None = None, model: str | None = None, **kwar
     create = _load_create_runtime()
     if model:
         kwargs["model"] = model
-    return create(provider=provider, **kwargs)
+    runtime = create(provider=provider, **kwargs)
+    _disable_default_openprogram_tools(runtime)
+    return runtime
+
+
+def _disable_default_openprogram_tools(runtime) -> None:
+    """Keep GUI Harness LLM calls text-only unless a caller opts into tools.
+
+    Newer OpenProgram runtimes expose built-in coding tools by default when
+    tools is omitted. GUI Harness already owns desktop actions through its
+    action registry, so planner/locator/verification calls should not receive
+    OpenProgram bash/read/write tools implicitly.
+    """
+    exec_fn = getattr(runtime, "exec", None)
+    if not callable(exec_fn) or getattr(runtime, "_gui_harness_tools_wrapped", False):
+        return
+
+    def exec_without_default_tools(self, *args, **exec_kwargs):
+        if "tools" in exec_kwargs and exec_kwargs["tools"] is not None:
+            return exec_fn(*args, **exec_kwargs)
+
+        # Runtime.exec currently only publishes _current_tools when the value
+        # is truthy, so passing tools=[] alone is not enough to suppress the
+        # provider default tools. Set the ContextVar around the call instead.
+        runtime_mod = importlib.import_module("openprogram.agentic_programming.runtime")
+        token = runtime_mod._current_tools.set([])
+        try:
+            return exec_fn(*args, **exec_kwargs)
+        finally:
+            runtime_mod._current_tools.reset(token)
+
+    runtime.exec = types.MethodType(exec_without_default_tools, runtime)
+    runtime._gui_harness_tools_wrapped = True
 
 
 def build_action_catalog(available: dict) -> str:
