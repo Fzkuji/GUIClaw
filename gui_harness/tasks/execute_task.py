@@ -138,11 +138,6 @@ def _action_scroll(direction: str) -> dict:
     return {"success": True}
 
 
-def _action_wait(seconds: float = 1.0) -> dict:
-    time.sleep(max(0.0, min(float(seconds), 10.0)))
-    return {"success": True}
-
-
 def _action_done(reasoning: str = "") -> dict:
     return {"success": True, "done": True, "reasoning": reasoning}
 
@@ -245,14 +240,6 @@ def _build_action_registry(allow_general: bool = True):
             "description": "Scroll the page up or down",
             "input": {
                 "direction": {"source": "llm", "type": str, "description": "up or down"},
-            },
-            "output": {"success": bool},
-        },
-        "wait": {
-            "function": _action_wait,
-            "description": "Wait briefly for the GUI to update",
-            "input": {
-                "seconds": {"source": "llm", "type": float, "description": "seconds to wait, max 10"},
             },
             "output": {"success": bool},
         },
