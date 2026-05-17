@@ -1,19 +1,19 @@
 # OSWorld Thunderbird Domain - GPT-5.5 Run Errors
 
-> 15 tasks | **20.0%** (1/5 officially scored so far) | started 2026-05-18
+> 15 tasks | **16.7%** (1/6 officially scored so far) | started 2026-05-18
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tasks | 15 |
-| Run so far | 6 |
-| Officially scored | 5 |
+| Run so far | 7 |
+| Officially scored | 6 |
 | Pass (1.0) | 1 |
-| Numeric fail (0.0) | 4 |
+| Numeric fail (0.0) | 5 |
 | Eval error / N/A | 1 |
-| Not reached | 9 |
-| Score so far | 20.0% (1/5) |
+| Not reached | 8 |
+| Score so far | 16.7% (1/6) |
 
 **Test environment:** Ubuntu VM at `172.16.105.130`, 1920x1080, `openai-codex/gpt-5.5` via GUI Agent Harness
 
@@ -40,7 +40,8 @@
 | 4 | 9bc3cc16 | Back up inbox email files to `~/emails.bak` | 0.0 FAIL | 15 | 156s | Started save/export flow and created folder name, but screenshot cascade prevented completion; evaluator found `/home/user/emails.bak` missing |
 | 5 | 3f28fe4f | Set plain text account signature | 1.0 PASS | 7 | 67s | Reached Account Settings signature field and entered two-line signature; evaluator confirmed prefs |
 | 6 | 5203d847 | Create local folder `Promotions` and filter matching inbox email subjects | 0.0 FAIL | 15 | 200s | Created local folder and opened filter editor, but did not finish filter rules/actions before step budget; evaluator found only a 25-byte `msgFilterRules.dat` |
-| 7-15 | - | Not reached | - | - | - | Continue from task 7 |
+| 7 | dd84e895 | Add a star to every email in local `Bills` folder | 0.0 FAIL | 15 | 167s | Starred at least one row, but mis-targeted later star clicks and switched focus to GIMP; screenshot-read cascade stopped the run before all messages were starred |
+| 8-15 | - | Not reached | - | - | - | Continue from task 8 |
 
 ## Error Details
 
@@ -52,23 +53,25 @@
 | 4 | Expected backup directory was missing | One verifier model error; screenshot read cascade on steps 12-15; conclusion got HTTP 400 invalid image | `ls -R /home/user/emails.bak` failed; score 0.0 | `task_4.log` |
 | 5 | Early model/session verifier failures | Recovered and typed `Anonym\nXYZ Lab` into the account signature field | PASS; downloaded prefs file matched expected signature | `task_5.log` |
 | 6 | Filter creation incomplete | Created `Promotions` local folder and entered filter name; final `plan_next_action()` failed with repeated `Agent session failed` | Evaluator downloaded 25-byte `msgFilterRules.dat`; score 0.0 | `task_6.log` |
+| 7 | Not all Bills messages were starred | Mis-targeted star coordinates clicked outside Thunderbird and focused GIMP; steps 9-15 hit screenshot-read cascade; conclusion got HTTP 400 invalid image | Evaluator downloaded `global-messages-db.sqlite`; score 0.0 | `task_7.log` |
 
 ## Error Categories
 
 | Category | Affected tasks | Evidence | Notes |
 |----------|----------------|----------|-------|
-| Opaque model/session failure | 1, 2, 3, 4, 5, 6 | `RuntimeError: Agent session failed` | Triggered immediate execution collapse on tasks 1-2 and slowed later tasks; tasks 5-6 partially recovered before final scoring. |
-| Screenshot/read cascade | 1, 2, 4 | `WARNING Image Read Error /tmp/gui_agent_screen.png`; `ValueError: need at least one array to stack` | Started after model/GUI failure. |
-| Invalid image passed to model | 1, 2, 4 | OpenAI HTTP 400: image data is not a valid image | Appeared during conclusion after screenshot read failures. |
+| Opaque model/session failure | 1, 2, 3, 4, 5, 6, 7 | `RuntimeError: Agent session failed` | Triggered immediate execution collapse on tasks 1-2 and slowed later tasks; some tasks partially recovered before final scoring. |
+| Screenshot/read cascade | 1, 2, 4, 7 | `WARNING Image Read Error /tmp/gui_agent_screen.png`; `ValueError: need at least one array to stack` | Started after model/GUI failure or bad window focus. |
+| Invalid image passed to model | 1, 2, 4, 7 | OpenAI HTTP 400: image data is not a valid image | Appeared during conclusion after screenshot read failures. |
+| GUI target drift / wrong window focus | 7 | Star-click targets landed outside Thunderbird and focused GIMP | Caused task 7 to lose the active app before the screenshot cascade. |
 | Output missing | 4 | Evaluator could not find `/home/user/emails.bak` | Export/backup flow did not complete. |
 | Incomplete app configuration | 6 | Evaluator found only a minimal `msgFilterRules.dat` | Local folder was created but message filter rules were not completed. |
 | Evaluator setup failure | 1 | Upload failed with status 500: read-only filesystem at `/home/user/Desktop/firefox_decrypt.py` | Separate from runner failure; official score is N/A. |
-| HuggingFace asset download instability | 1, 3 | SSL EOF retries while downloading task assets | Task 1 download recovered but upload failed; task 3 setup recovered after curl fallback. |
-| Missing proxy config warning | 1-6 | `evaluation_examples/settings/proxy/dataimpulse.json` not found | Non-blocking so far. |
+| HuggingFace asset download instability | 1, 3, 7 | SSL EOF retries while downloading task assets | Downloads recovered after retries/curl fallback where applicable. |
+| Missing proxy config warning | 1-7 | `evaluation_examples/settings/proxy/dataimpulse.json` not found | Non-blocking so far. |
 
 ## Handoff Notes
 
-- Continue at Thunderbird task 7 in `runs/thunderbird_all_20260518_0442`.
+- Continue at Thunderbird task 8 in `runs/thunderbird_all_20260518_0442`.
 - Official `test_all.json` lists 15 Thunderbird tasks; the older `benchmarks/osworld/thunderbird.md` says 24 and is stale.
 - Treat official evaluator score as benchmark truth. Task 1 has no score because evaluator setup failed after runner failure.
 - Watch for VM filesystem state. Task 1 evaluator could not upload to `/home/user/Desktop/firefox_decrypt.py` due to a read-only filesystem.
